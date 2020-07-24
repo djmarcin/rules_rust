@@ -166,6 +166,23 @@ filegroup(
 )
 """.format(binary_ext = system_to_binary_ext(system))
 
+def BUILD_for_rustsrc(target_triple):
+    """Emits a BUILD file the rustsrc .tar.gz."""
+
+    system = triple_to_system(target_triple)
+    return """
+load("@io_bazel_rules_rust//rust:toolchain.bzl", "rust_toolchain")
+
+filegroup(
+    name = "rustsrc",
+    srcs = ["bin/rustfmt{binary_ext}"],
+    visibility = ["//visibility:public"],
+)
+
+""".format(
+        binary_ext = system_to_binary_ext(system),
+    )
+
 def BUILD_for_stdlib(target_triple):
     """Emits a BUILD file the stdlib .tar.gz."""
 
@@ -372,6 +389,28 @@ def _load_rust_compiler(ctx):
     compiler_BUILD = BUILD_for_compiler(target_triple) + BUILD_for_clippy(target_triple)
 
     return compiler_BUILD
+
+def _load_rust_src(ctx):
+    """Loads the rust source code. This is used by the rust-analyzer rust-project.json
+    generator.
+
+    Args:
+      ctx: A repository_ctx.
+    Returns:
+      The BUILD file contents for this compiler and compiler library
+    """
+    target_triple = ctx.attr.exec_triple
+    load_arbitrary_tool(
+        ctx,
+        iso_date = ctx.attr.iso_date,
+        param_prefix = "src_",
+        target_triple = target_triple,
+        tool_name = "src",
+        tool_subdirectory = "src",
+        version = ctx.attr.rustfmt_version,
+    )
+
+    return BUILD_for_rustsrc(target_triple)
 
 def _load_rust_stdlib(ctx, target_triple):
     """Loads a rust standard library and yields corresponding BUILD for it

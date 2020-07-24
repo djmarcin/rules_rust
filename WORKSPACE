@@ -89,3 +89,6 @@ bazel_version(name = "bazel_version")
 
 load("@examples//hello_sys:workspace.bzl", "remote_deps")
 remote_deps()
+
+
+# Rust-analyzer rules

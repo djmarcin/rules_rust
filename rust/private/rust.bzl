@@ -462,13 +462,6 @@ _rust_common_attrs = {
         allow_single_file = True,
         cfg = "exec",
     ),
-    "_process_wrapper_worker": attr.label(
-        default = "@rustc_worker//file",
-        # Actually we may want the persistent worker to be built by the rust rules themselves, but right now we are just going to use a binary.
-        executable = True,
-        allow_single_file = True,
-        cfg = "exec",
-    ),
 }
 
 _rust_library_attrs = {
@@ -504,6 +497,7 @@ rust_library = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust library crate.
@@ -594,6 +588,7 @@ rust_binary = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust binary crate.
@@ -692,6 +687,7 @@ rust_test = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust test crate.
@@ -840,6 +836,7 @@ rust_test_binary = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust test binary, without marking this rule as a Bazel test.
@@ -863,6 +860,7 @@ rust_benchmark = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust benchmark test.

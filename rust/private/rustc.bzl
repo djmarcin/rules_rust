@@ -432,6 +432,7 @@ def construct_arguments(
         build_flags_files (list): The output files of a `cargo_build_script` actions containing rustc build flags
         maker_path (File): An optional clippy marker file
         aspect (bool): True if called in an aspect context.
+        use_worker (bool): If True, sets up the arguments in a worker-compatible fashion
 
     Returns:
         tuple: A tuple of the following items

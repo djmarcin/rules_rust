@@ -402,6 +402,7 @@ def construct_arguments(
         maker_path (File): An optional clippy marker file
         aspect (bool): True if called in an aspect context.
         emit (list): Values for the --emit flag to rustc.
+        use_worker (bool): If True, sets up the arguments in a worker-compatible fashion
 
     Returns:
         tuple: A tuple of the following items

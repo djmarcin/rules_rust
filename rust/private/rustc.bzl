@@ -450,7 +450,7 @@ def construct_arguments(
     if use_worker:
         # Write the args to a param file that will be used by Bazel to send messages to the worker.
         args.set_param_file_format("multiline")
-        args.use_param_file("@%s", use_always=True)
+        args.use_param_file("@%s", use_always = True)
 
     if build_env_file != None:
         args.add("--env-file", build_env_file)
@@ -643,7 +643,7 @@ def rustc_compile_action(
         executable = worker_binary
         tools = [ctx.executable._process_wrapper]
         arguments = [ctx.executable._process_wrapper.path, toolchain.rustc.path, ctx.var["COMPILATION_MODE"], args]
-        execution_requirements = { "supports-workers": "1" }
+        execution_requirements = {"supports-workers": "1"}
     else:
         # Not all execution platforms support a worker.
         executable = ctx.executable._process_wrapper

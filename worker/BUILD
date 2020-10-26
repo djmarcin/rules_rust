@@ -22,6 +22,28 @@ toolchain(
     toolchain_type = ":toolchain_type",
 )
 
+load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+
+rust_library(
+    name = "rustc_worker",
+    srcs = [
+        "src/lib.rs",
+        "src/worker_protocol.rs",
+    ],
+    deps = [
+        "@io_bazel_rules_rust//proto/raze:protobuf",
+    ],
+)
+
+rust_binary(
+    name = "rustc-worker",
+    srcs = ["src/main.rs"],
+    deps = [
+        ":rustc_worker",
+        "@io_bazel_rules_rust//proto/raze:protobuf",
+    ],
+)
+
 # These toolchains are only registered if workers are enabled in rust_repositories().
 
 worker_toolchain(

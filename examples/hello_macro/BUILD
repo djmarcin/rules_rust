@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
     "rust_doc",
@@ -8,12 +6,23 @@ load(
     "rust_test",
 )
 
+package(default_visibility = ["//visibility:public"])
+
 rust_library(
     name = "hello_macro",
     srcs = [
         "src/lib.rs",
     ],
     crate_type = "proc-macro",
+)
+
+rust_library(
+    name = "hello_macro_2018",
+    srcs = [
+        "src/lib_2018.rs",
+    ],
+    crate_type = "proc-macro",
+    edition = "2018",
 )
 
 rust_test(

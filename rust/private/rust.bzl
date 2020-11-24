@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# buildifier: disable=module-docstring
 load("@io_bazel_rules_rust//rust:private/rustc.bzl", "CrateInfo", "rustc_compile_action")
-load("@io_bazel_rules_rust//rust:private/utils.bzl", "find_toolchain")
+load("@io_bazel_rules_rust//rust:private/utils.bzl", "determine_output_hash", "find_toolchain")
 
 # TODO(marco): Separate each rule into its own file.
 
-def _determine_output_hash(lib_rs):
-    return repr(hash(lib_rs.path))
+def _assert_no_deprecated_attributes(ctx):
+    """Forces a failure if any deprecated attributes were specified
 
-def _deprecated_attributes(ctx):
+    Args:
+        ctx (ctx): The current rule's context object
+    """
     if getattr(ctx.attr, "out_dir_tar", None):
         fail(ctx, "".join([
             "`out_dir_tar` is no longer supported, please use cargo/cargo_build_script.bzl ",
@@ -28,6 +31,17 @@ def _deprecated_attributes(ctx):
         ]))
 
 def _determine_lib_name(name, crate_type, toolchain, lib_hash = ""):
+    """See https://github.com/bazelbuild/rules_rust/issues/405
+
+    Args:
+        name (str): The name of the current target
+        crate_type (str): The `crate_type` attribute from a `rust_library`
+        toolchain (rust_toolchain): The current `rust_toolchain`
+        lib_hash (str, optional): The hashed crate root path. Defaults to "".
+
+    Returns:
+        str: A unique library name
+    """
     extension = None
     prefix = ""
     if crate_type in ("dylib", "cdylib", "proc-macro"):
@@ -58,14 +72,33 @@ def _determine_lib_name(name, crate_type, toolchain, lib_hash = ""):
     )
 
 def get_edition(attr, toolchain):
+    """Returns the Rust edition from either the current rule's attirbutes or the current `rust_toolchain`
+
+    Args:
+        attr (struct): The current rule's attributes
+        toolchain (rust_toolchain): The `rust_toolchain` for the current target
+
+    Returns:
+        str: The target Rust edition
+    """
     if getattr(attr, "edition"):
         return attr.edition
     else:
         return toolchain.default_edition
 
 def crate_root_src(attr, srcs, file_name = "lib.rs"):
-    """Finds the source file for the crate root."""
+    """Finds the source file for the crate root.
 
+    Args:
+        attr (struct): The attributes of the current target
+        srcs (list): A list of all sources for the target Crate.
+        file_name (str, optional): The basename of the crate's root file. Defaults to "lib.rs".
+
+    Returns:
+        File: The root File object for a given crate. See the following links for more details:
+            - https://doc.rust-lang.org/cargo/reference/cargo-targets.html#library
+            - https://doc.rust-lang.org/cargo/reference/cargo-targets.html#binaries
+    """
     crate_root = None
     if hasattr(attr, "crate_root"):
         if attr.crate_root:
@@ -83,8 +116,14 @@ def crate_root_src(attr, srcs, file_name = "lib.rs"):
     return crate_root
 
 def _shortest_src_with_basename(srcs, basename):
-    """
-    Finds the shortest among the paths in srcs that match the desired basename.
+    """Finds the shortest among the paths in srcs that match the desired basename.
+
+    Args:
+        srcs (list): A list of File objects
+        basename (str): The target basename to match against.
+
+    Returns:
+        File: The File object with the shortest path that matches `basename`
     """
     shortest = None
     for f in srcs:
@@ -94,14 +133,23 @@ def _shortest_src_with_basename(srcs, basename):
     return shortest
 
 def _rust_library_impl(ctx):
+    """The implementation of the `rust_library` rule
+
+    Args:
+        ctx (ctx): The rule's context object
+
+    Returns:
+        list: A list of providers. See `rustc_compile_action`
+    """
+
     # Find lib.rs
-    lib_rs = crate_root_src(ctx.attr, ctx.files.srcs)
-    _deprecated_attributes(ctx)
+    crate_root = crate_root_src(ctx.attr, ctx.files.srcs)
+    _assert_no_deprecated_attributes(ctx)
 
     toolchain = find_toolchain(ctx)
 
     # Determine unique hash for this rlib
-    output_hash = _determine_output_hash(lib_rs)
+    output_hash = determine_output_hash(crate_root)
 
     crate_name = ctx.label.name.replace("-", "_")
     rust_lib_name = _determine_lib_name(
@@ -118,7 +166,7 @@ def _rust_library_impl(ctx):
         crate_info = CrateInfo(
             name = crate_name,
             type = ctx.attr.crate_type,
-            root = lib_rs,
+            root = crate_root,
             srcs = ctx.files.srcs,
             deps = ctx.attr.deps,
             proc_macro_deps = ctx.attr.proc_macro_deps,
@@ -132,6 +180,14 @@ def _rust_library_impl(ctx):
     )
 
 def _rust_binary_impl(ctx):
+    """The implementation of the `rust_binary` rule
+
+    Args:
+        ctx (ctx): The rule's context object
+
+    Returns:
+        list: A list of providers. See `rustc_compile_action`
+    """
     toolchain = find_toolchain(ctx)
     crate_name = ctx.label.name.replace("-", "_")
 
@@ -158,14 +214,17 @@ def _rust_binary_impl(ctx):
     )
 
 def _rust_test_common(ctx, toolchain, output):
-    """
-    Builds a Rust test binary.
+    """Builds a Rust test binary.
 
     Args:
-        ctx: The ctx object for the current target.
-        test_binary: The File object for the test binary.
+        ctx (ctx): The ctx object for the current target.
+        toolchain (rust_toolchain): The current `rust_toolchain`
+        output (File): The output File that will be produced, depends on crate type.
+
+    Returns:
+        list: The list of providers. See `rustc_compile_action`
     """
-    _deprecated_attributes(ctx)
+    _assert_no_deprecated_attributes(ctx)
 
     crate_name = ctx.label.name.replace("-", "_")
 
@@ -210,6 +269,14 @@ def _rust_test_common(ctx, toolchain, output):
     )
 
 def _rust_test_impl(ctx):
+    """The implementation of the `rust_test` rule
+
+    Args:
+        ctx (ctx): The rule's context object
+
+    Returns:
+        list: A list of providers. See `_rust_test_common`
+    """
     toolchain = find_toolchain(ctx)
 
     output = ctx.actions.declare_file(
@@ -219,7 +286,15 @@ def _rust_test_impl(ctx):
     return _rust_test_common(ctx, toolchain, output)
 
 def _rust_benchmark_impl(ctx):
-    _deprecated_attributes(ctx)
+    """The implementation of the `rust_test` rule
+
+    Args:
+        ctx (ctx): The rule's context object
+
+    Returns:
+        list: A list containing a DefaultInfo provider
+    """
+    _assert_no_deprecated_attributes(ctx)
 
     toolchain = find_toolchain(ctx)
 
@@ -257,18 +332,25 @@ def _rust_benchmark_impl(ctx):
             is_executable = True,
         )
 
-    runfiles = ctx.runfiles(
-        files = info.runfiles + [bench_binary],
-        collect_data = True,
-    )
-
-    return struct(
-        runfiles = runfiles,
-        executable = bench_script,
-    )
+    return [
+        DefaultInfo(
+            runfiles = ctx.runfiles(
+                files = info.runfiles + [bench_binary],
+                collect_data = True,
+            ),
+            executable = bench_script,
+        ),
+    ]
 
 def _tidy(doc_string):
-    """Tidy excess whitespace in docstrings to not break index.md"""
+    """Tidy excess whitespace in docstrings to not break index.md
+
+    Args:
+        doc_string (str): A docstring style string
+
+    Returns:
+        str: A string optimized for stardoc rendering
+    """
     return "\n".join([line.strip() for line in doc_string.splitlines()])
 
 _rust_common_attrs = {
@@ -335,6 +417,12 @@ _rust_common_attrs = {
     "rustc_env": attr.string_dict(
         doc = _tidy("""
             Dictionary of additional `"key": "value"` environment variables to set for rustc.
+
+            rust_test()/rust_binary() rules can use $(rootpath //package:target) to pass in the
+            location of a generated file or external tool. Cargo build scripts that wish to
+            expand locations should use cargo_build_script()'s build_script_env argument instead,
+            as build scripts are run in a different environment - see cargo_build_script()'s
+            documentation for more.
         """),
     ),
     "crate_features": attr.string_list(
@@ -363,7 +451,9 @@ _rust_common_attrs = {
             ".tar.gz",
         ],
     ),
-    "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+    "_cc_toolchain": attr.label(
+        default = "@bazel_tools//tools/cpp:current_cc_toolchain",
+    ),
     "_process_wrapper": attr.label(
         default = "@io_bazel_rules_rust//util/process_wrapper",
         executable = True,
@@ -376,7 +466,7 @@ _rust_library_attrs = {
     "crate_type": attr.string(
         doc = _tidy("""
             The type of linkage to use for building this library.
-            Options include "lib", "rlib", "dylib", "cdylib", "staticlib", and "proc-macro".
+            Options include `"lib"`, `"rlib"`, `"dylib"`, `"cdylib"`, `"staticlib"`, and `"proc-macro"`.
 
             The exact output file will depend on the toolchain used.
         """),
@@ -397,7 +487,7 @@ _rust_test_attrs = {
 }
 
 rust_library = rule(
-    _rust_library_impl,
+    implementation = _rust_library_impl,
     attrs = dict(_rust_common_attrs.items() +
                  _rust_library_attrs.items()),
     fragments = ["cpp"],
@@ -406,14 +496,14 @@ rust_library = rule(
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
-    doc = """
+    doc = """\
 Builds a Rust library crate.
 
 Example:
 
 Suppose you have the following directory structure for a simple Rust library crate:
 
-```
+```output
 [workspace]/
     WORKSPACE
     hello_lib/
@@ -462,7 +552,7 @@ rust_library(
 ```
 
 Build the library:
-```
+```output
 $ bazel build //hello_lib
 INFO: Found 1 target...
 Target //examples/rust/hello_lib:hello_lib up-to-date:
@@ -487,7 +577,7 @@ _rust_binary_attrs = {
 }
 
 rust_binary = rule(
-    _rust_binary_impl,
+    implementation = _rust_binary_impl,
     attrs = dict(_rust_common_attrs.items() + _rust_binary_attrs.items()),
     executable = True,
     fragments = ["cpp"],
@@ -496,7 +586,7 @@ rust_binary = rule(
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
-    doc = """
+    doc = """\
 Builds a Rust binary crate.
 
 Example:
@@ -505,7 +595,7 @@ Suppose you have the following directory structure for a Rust project with a
 library crate, `hello_lib`, and a binary crate, `hello_world` that uses the
 `hello_lib` library:
 
-```
+```output
 [workspace]/
     WORKSPACE
     hello_lib/
@@ -583,7 +673,7 @@ Hello world
 )
 
 rust_test = rule(
-    _rust_test_impl,
+    implementation = _rust_test_impl,
     attrs = dict(_rust_common_attrs.items() +
                  _rust_test_attrs.items()),
     executable = True,
@@ -594,15 +684,15 @@ rust_test = rule(
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
-    doc = """
+    doc = """\
 Builds a Rust test crate.
 
 Examples:
 
-Suppose you have the following directory structure for a Rust library crate
+Suppose you have the following directory structure for a Rust library crate \
 with unit test code in the library sources:
 
-```
+```output
 [workspace]/
     WORKSPACE
     hello_lib/
@@ -639,7 +729,7 @@ mod test {
 }
 ```
 
-To build and run the tests, simply add a `rust_test` rule with no `srcs` and
+To build and run the tests, simply add a `rust_test` rule with no `srcs` and \
 only depends on the `hello_lib` `rust_library` target:
 
 `hello_lib/BUILD`:
@@ -661,10 +751,10 @@ rust_test(
 
 Run the test with `bazel build //hello_lib:hello_lib_test`.
 
-To run a crate or lib with the `#[cfg(test)]` configuration, handling inline
+To run a crate or lib with the `#[cfg(test)]` configuration, handling inline \
 tests, you should specify the crate directly like so.
 
-```
+```python
 rust_test(
     name = "hello_lib_test",
     crate = ":hello_lib",
@@ -675,14 +765,14 @@ rust_test(
 
 ### Example: `test` directory
 
-Integration tests that live in the [`tests` directory][int-tests], they are
-essentially built as separate crates. Suppose you have the following directory
-structure where `greeting.rs` is an integration test for the `hello_lib`
+Integration tests that live in the [`tests` directory][int-tests], they are \
+essentially built as separate crates. Suppose you have the following directory \
+structure where `greeting.rs` is an integration test for the `hello_lib` \
 library crate:
 
 [int-tests]: http://doc.rust-lang.org/book/testing.html#the-tests-directory
 
-```
+```output
 [workspace]/
     WORKSPACE
     hello_lib/
@@ -732,7 +822,7 @@ Run the test with `bazel build //hello_lib:hello_lib_test`.
 )
 
 rust_test_binary = rule(
-    _rust_test_impl,
+    implementation = _rust_test_impl,
     attrs = dict(_rust_common_attrs.items() +
                  _rust_test_attrs.items()),
     executable = True,
@@ -742,7 +832,7 @@ rust_test_binary = rule(
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
-    doc = """
+    doc = """\
 Builds a Rust test binary, without marking this rule as a Bazel test.
 
 **Warning**: This rule is currently experimental.
@@ -756,7 +846,7 @@ See `rust_test` for example usage.
 )
 
 rust_benchmark = rule(
-    _rust_benchmark_impl,
+    implementation = _rust_benchmark_impl,
     attrs = _rust_common_attrs,
     executable = True,
     fragments = ["cpp"],
@@ -765,22 +855,22 @@ rust_benchmark = rule(
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
-    doc = """
+    doc = """\
 Builds a Rust benchmark test.
 
-**Warning**: This rule is currently experimental. [Rust Benchmark
-tests][rust-bench] require the `Bencher` interface in the unstable `libtest`
-crate, which is behind the `test` unstable feature gate. As a result, using
-this rule would require using a nightly binary release of Rust.
+**Warning**: This rule is currently experimental. [Rust Benchmark tests][rust-bench] \
+require the `Bencher` interface in the unstable `libtest` crate, which is behind the \
+`test` unstable feature gate. As a result, using this rule would require using a nightly \
+binary release of Rust.
 
 [rust-bench]: https://doc.rust-lang.org/book/benchmark-tests.html
 
 Example:
 
-Suppose you have the following directory structure for a Rust project with a
+Suppose you have the following directory structure for a Rust project with a \
 library crate, `fibonacci` with benchmarks under the `benches/` directory:
 
-```
+```output
 [workspace]/
   WORKSPACE
   fibonacci/

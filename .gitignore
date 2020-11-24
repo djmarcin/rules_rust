@@ -1,15 +1,19 @@
+# A file specifying filepatterns for git to ignore.
+
 # vim
 *.swp
 
 # bazel
 /bazel-*
 /examples/bazel-*
+/examples/*/bazel-*
 /docs/bazel-*
 
 # rustfmt
 *.rs.bk
 
-# protobuf cargo-raze files
-/proto/raze/target
+# Cargo
+**/target/
 
-node_modules
+# npm
+**/node_modules/

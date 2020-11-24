@@ -59,7 +59,7 @@ impl BuildScriptOutput {
         if key_split.len() <= 1 || key_split[0] != "cargo" {
             // Not a cargo directive.
             print!("{}", line);
-            return None
+            return None;
         }
         match key_split[1] {
             "rustc-link-lib" => Some(BuildScriptOutput::LinkLib(param)),
@@ -68,21 +68,30 @@ impl BuildScriptOutput {
             "rustc-flags" => Some(BuildScriptOutput::Flags(param)),
             "rustc-env" => Some(BuildScriptOutput::Env(param)),
             "rerun-if-changed" | "rerun-if-env-changed" =>
-                // Ignored because Bazel will re-run if those change all the time.
-                None,
+            // Ignored because Bazel will re-run if those change all the time.
+            {
+                None
+            }
             "warning" => {
                 eprintln!("Build Script Warning: {}", split[1]);
                 None
-            },
+            }
             "rustc-cdylib-link-arg" => {
                 // cargo:rustc-cdylib-link-arg=FLAG — Passes custom flags to a linker for cdylib crates.
-                eprintln!("Warning: build script returned unsupported directive `{}`", split[0]);
+                eprintln!(
+                    "Warning: build script returned unsupported directive `{}`",
+                    split[0]
+                );
                 None
-            },
+            }
             _ => {
                 // cargo:KEY=VALUE — Metadata, used by links scripts.
-                Some(BuildScriptOutput::DepEnv(format!("{}={}", key_split[1].to_uppercase(), param)))
-            },
+                Some(BuildScriptOutput::DepEnv(format!(
+                    "{}={}",
+                    key_split[1].to_uppercase(),
+                    param
+                )))
+            }
         }
     }
 
@@ -101,29 +110,26 @@ impl BuildScriptOutput {
 
     /// Take a [Command], execute it and converts its input into a vector of [BuildScriptOutput]
     pub fn from_command(cmd: &mut Command) -> Result<Vec<BuildScriptOutput>, Option<i32>> {
-        let mut child = cmd.stdout(Stdio::piped()).spawn().expect("Unable to start binary");
-        let ecode = child.wait().expect("failed to wait on child");
-        let reader = BufReader::new(
-                child
-                .stdout
-                .as_mut()
-                .expect("Failed to open stdout"),
-            );
+        let mut child = cmd
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Unable to start binary");
+        let reader = BufReader::new(child.stdout.as_mut().expect("Failed to open stdout"));
         let output = Self::from_reader(reader);
+        let ecode = child.wait().expect("failed to wait on child");
         if ecode.success() {
             Ok(output)
         } else {
             Err(ecode.code())
         }
-
     }
 
     /// Convert a vector of [BuildScriptOutput] into a list of environment variables.
-    pub fn to_env(v: &Vec<BuildScriptOutput>) -> String {
+    pub fn to_env(v: &Vec<BuildScriptOutput>, exec_root: &str) -> String {
         v.iter()
             .filter_map(|x| {
                 if let BuildScriptOutput::Env(env) = x {
-                    Some(env.to_owned())
+                    Some(Self::redact_exec_root(env, exec_root))
                 } else {
                     None
                 }
@@ -133,19 +139,12 @@ impl BuildScriptOutput {
     }
 
     /// Convert a vector of [BuildScriptOutput] into a list of dependencies environment variables.
-    pub fn to_dep_env(v: &Vec<BuildScriptOutput>, crate_name: &str) -> String {
-        // TODO: make use of `strip_suffix`.
-        const SYS_CRATE_SUFFIX: &str = "-sys";
-        let name = if crate_name.ends_with(SYS_CRATE_SUFFIX) {
-            crate_name.split_at(crate_name.rfind(SYS_CRATE_SUFFIX).unwrap()).0
-        } else {
-            crate_name
-        };
-        let prefix = format!("DEP_{}_", name.replace("-", "_").to_uppercase());
+    pub fn to_dep_env(v: &Vec<BuildScriptOutput>, crate_links: &str, exec_root: &str) -> String {
+        let prefix = format!("DEP_{}_", crate_links.replace("-", "_").to_uppercase());
         v.iter()
             .filter_map(|x| {
                 if let BuildScriptOutput::DepEnv(env) = x {
-                    Some(format!("{}{}", prefix, env.to_owned()))
+                    Some(format!("{}{}", prefix, Self::redact_exec_root(env, exec_root)))
                 } else {
                     None
                 }
@@ -165,13 +164,17 @@ impl BuildScriptOutput {
                 BuildScriptOutput::Flags(e) => compile_flags.push(e.to_owned()),
                 BuildScriptOutput::LinkLib(e) => link_flags.push(format!("-l{}", e)),
                 BuildScriptOutput::LinkSearch(e) => link_flags.push(format!("-L{}", e)),
-                _ => { },
+                _ => {}
             }
         }
         CompileAndLinkFlags {
             compile_flags: compile_flags.join("\n"),
-            link_flags: link_flags.join("\n").replace(exec_root, "${pwd}"),
+            link_flags: Self::redact_exec_root(&link_flags.join("\n"), exec_root),
         }
+    }
+
+    fn redact_exec_root(value: &str, exec_root: &str) -> String {
+        value.replace(exec_root, "${pwd}")
     }
 }
 
@@ -193,30 +196,45 @@ cargo:rerun-if-changed=ignored
 cargo:rustc-cfg=feature=awesome
 cargo:version=123
 cargo:version_number=1010107f
+cargo:include_path=/some/absolute/path/include
+cargo:rustc-env=SOME_PATH=/some/absolute/path/beep
 ",
         );
         let reader = BufReader::new(buff);
         let result = BuildScriptOutput::from_reader(reader);
-        assert_eq!(result.len(), 8);
+        assert_eq!(result.len(), 10);
         assert_eq!(result[0], BuildScriptOutput::LinkLib("sdfsdf".to_owned()));
         assert_eq!(result[1], BuildScriptOutput::Env("FOO=BAR".to_owned()));
-        assert_eq!(result[2], BuildScriptOutput::LinkSearch("/some/absolute/path/bleh".to_owned()));
+        assert_eq!(
+            result[2],
+            BuildScriptOutput::LinkSearch("/some/absolute/path/bleh".to_owned())
+        );
         assert_eq!(result[3], BuildScriptOutput::Env("BAR=FOO".to_owned()));
         assert_eq!(result[4], BuildScriptOutput::Flags("-Lblah".to_owned()));
         assert_eq!(
             result[5],
             BuildScriptOutput::Cfg("feature=awesome".to_owned())
         );
-        assert_eq!(result[6], BuildScriptOutput::DepEnv("VERSION=123".to_owned()));
-        assert_eq!(result[7], BuildScriptOutput::DepEnv("VERSION_NUMBER=1010107f".to_owned()));
-
         assert_eq!(
-            BuildScriptOutput::to_dep_env(&result, "my-crate-sys"),
-            "DEP_MY_CRATE_VERSION=123\nDEP_MY_CRATE_VERSION_NUMBER=1010107f".to_owned()
+            result[6],
+            BuildScriptOutput::DepEnv("VERSION=123".to_owned())
         );
         assert_eq!(
-            BuildScriptOutput::to_env(&result),
-            "FOO=BAR\nBAR=FOO".to_owned()
+            result[7],
+            BuildScriptOutput::DepEnv("VERSION_NUMBER=1010107f".to_owned())
+        );
+        assert_eq!(
+            result[9],
+            BuildScriptOutput::Env("SOME_PATH=/some/absolute/path/beep".to_owned())
+        );
+
+        assert_eq!(
+            BuildScriptOutput::to_dep_env(&result, "ssh2", "/some/absolute/path"),
+            "DEP_SSH2_VERSION=123\nDEP_SSH2_VERSION_NUMBER=1010107f\nDEP_SSH2_INCLUDE_PATH=${pwd}/include".to_owned()
+        );
+        assert_eq!(
+            BuildScriptOutput::to_env(&result, "/some/absolute/path"),
+            "FOO=BAR\nBAR=FOO\nSOME_PATH=${pwd}/beep".to_owned()
         );
         assert_eq!(
             BuildScriptOutput::to_flags(&result, "/some/absolute/path"),
@@ -228,5 +246,4 @@ cargo:version_number=1010107f
             }
         );
     }
-
 }

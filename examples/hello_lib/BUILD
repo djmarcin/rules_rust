@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
     "rust_doc",
@@ -8,6 +6,8 @@ load(
     "rust_test",
 )
 load("@io_bazel_rules_rust//:aspects.bzl", "rust_analyzer")
+
+package(default_visibility = ["//visibility:public"])
 
 rust_library(
     name = "hello_lib",
@@ -52,8 +52,8 @@ rust_library(
     srcs = [
         "tests/greeting.rs",
     ],
-    deps = [":hello_lib"],
     crate_type = "staticlib",
+    deps = [":hello_lib"],
 )
 
 # Regression test for #368: cdylib lib with dependencies fail.
@@ -62,8 +62,8 @@ rust_library(
     srcs = [
         "tests/greeting.rs",
     ],
-    deps = [":hello_lib"],
     crate_type = "cdylib",
+    deps = [":hello_lib"],
 )
 
 rust_test(

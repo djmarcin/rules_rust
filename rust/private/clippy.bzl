@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# buildifier: disable=module-docstring
 load(
     "@io_bazel_rules_rust//rust:private/rustc.bzl",
     "CrateInfo",
@@ -24,7 +25,7 @@ load(
     "@io_bazel_rules_rust//rust:private/rust.bzl",
     "crate_root_src",
 )
-load("@io_bazel_rules_rust//rust:private/utils.bzl", "find_toolchain")
+load("@io_bazel_rules_rust//rust:private/utils.bzl", "determine_output_hash", "find_toolchain")
 
 _rust_extensions = [
     "rs",
@@ -85,12 +86,13 @@ def _clippy_aspect_impl(target, ctx):
         feature_configuration,
         crate_info,
         dep_info,
-        output_hash = repr(hash(root.path)),
+        output_hash = determine_output_hash(root),
         rust_flags = [],
         out_dir = out_dir,
         build_env_file = build_env_file,
         build_flags_files = build_flags_files,
         maker_path = clippy_marker.path,
+        aspect = True,
     )
 
     # Deny the default-on clippy warning levels.
@@ -140,7 +142,7 @@ rust_clippy_aspect = aspect(
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
     implementation = _clippy_aspect_impl,
-    doc = """
+    doc = """\
 Executes the clippy checker on specified targets.
 
 This aspect applies to existing rust_library, rust_test, and rust_binary rules.
@@ -166,8 +168,10 @@ rust_test(
 
 Then the targets can be analyzed with clippy using the following command:
 
+```output
 $ bazel build --aspects=@io_bazel_rules_rust//rust:rust.bzl%rust_clippy_aspect \
               --output_groups=clippy_checks //hello_lib:all
+```
 """,
 )
 
@@ -180,10 +184,10 @@ rust_clippy = rule(
     attrs = {
         "deps": attr.label_list(aspects = [rust_clippy_aspect]),
     },
-    doc = """
+    doc = """\
 Executes the clippy checker on a specific target.
 
-Similar to `rust_clippy_aspect`, but allows specifying a list of dependencies
+Similar to `rust_clippy_aspect`, but allows specifying a list of dependencies \
 within the build system.
 
 For example, given the following example targets:

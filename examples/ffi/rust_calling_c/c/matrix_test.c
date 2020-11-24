@@ -15,16 +15,17 @@
 #include "ffi/rust_calling_c/c/matrix.h"
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 void matrix_print(const Matrix* m) {
   for (size_t i = 0; i < m->rows; ++i) {
     for (size_t j = 0; j < m->cols; ++j) {
       uint64_t val = 0;
       matrix_at(m, i, j, &val);
-      printf("%lu ", val);
+      printf("%"PRIu64" ", val);
     }
     printf("\n");
   }

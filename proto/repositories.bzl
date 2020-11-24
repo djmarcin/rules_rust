@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//proto/raze:crates.bzl", _crate_deps = "raze_fetch_remote_crates")
+# buildifier: disable=module-docstring
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
+load("//proto/raze:crates.bzl", "rules_rust_proto_fetch_remote_crates")
 
+# buildifier: disable=unnamed-macro
 def rust_proto_repositories():
     """Declare dependencies needed for proto compilation."""
     maybe(
@@ -43,18 +45,6 @@ def rust_proto_repositories():
 
     maybe(
         http_archive,
-        name = "bazel_skylib",
-        strip_prefix = "bazel-skylib-1.0.2",
-        urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/archive/1.0.2.zip",
-            "https://github.com/bazelbuild/bazel-skylib/archive/1.0.2.zip",
-        ],
-        type = "zip",
-        sha256 = "64ad2728ccdd2044216e4cec7815918b7bb3bb28c95b7e9d951f9d4eccb07625",
-    )
-
-    maybe(
-        http_archive,
         name = "six",
         build_file = "@com_google_protobuf//:third_party/six.BUILD",
         sha256 = "d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73",
@@ -76,7 +66,7 @@ def rust_proto_repositories():
         ],
     )
 
-    _crate_deps()
+    rules_rust_proto_fetch_remote_crates()
 
     # Register toolchains
     native.register_toolchains(

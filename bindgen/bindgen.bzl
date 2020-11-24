@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# buildifier: disable=module-docstring
+load("@io_bazel_rules_rust//rust:private/utils.bzl", "find_toolchain", "get_libs_for_static_executable")
 load("@io_bazel_rules_rust//rust:rust.bzl", "rust_library")
-load("@io_bazel_rules_rust//rust:private/legacy_cc_starlark_api_shim.bzl", "get_libs_for_static_executable")
-load("@io_bazel_rules_rust//rust:private/utils.bzl", "find_toolchain")
 
 def rust_bindgen_library(
         name,
@@ -26,6 +26,14 @@ def rust_bindgen_library(
     """Generates a rust source file for `header`, and builds a rust_library.
 
     Arguments are the same as `rust_bindgen`, and `kwargs` are passed directly to rust_library.
+
+    Args:
+        name (str): A unique name for this target.
+        header (str): The label of the .h file to generate bindings for.
+        cc_lib (str): The label of the cc_library that contains the .h file. This is used to find the transitive includes.
+        bindgen_flags (list, optional): Flags to pass directly to the bindgen executable. See https://rust-lang.github.io/rust-bindgen/ for details.
+        clang_flags (list, optional): Flags to pass directly to the clang executable.
+        **kwargs: Arguments to forward to the underlying `rust_library` rule.
     """
 
     rust_bindgen(
@@ -95,9 +103,9 @@ def _rust_bindgen_impl(ctx):
     args.add_all(clang_args)
 
     env = {
-        "RUST_BACKTRACE": "1",
         "CLANG_PATH": clang_bin.path,
         "LIBCLANG_PATH": libclang_dir,
+        "RUST_BACKTRACE": "1",
     }
 
     if libstdcxx:
@@ -141,8 +149,8 @@ def _rust_bindgen_impl(ctx):
         )
 
 rust_bindgen = rule(
-    _rust_bindgen_impl,
     doc = "Generates a rust source file from a cc_library and a header.",
+    implementation = _rust_bindgen_impl,
     attrs = {
         "header": attr.label(
             doc = "The .h file to generate bindings for.",
@@ -188,27 +196,27 @@ rust_bindgen_toolchain = rule(
         "bindgen": attr.label(
             doc = "The label of a `bindgen` executable.",
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
         "rustfmt": attr.label(
             doc = "The label of a `rustfmt` executable. If this is provided, generated sources will be formatted.",
             executable = True,
-            cfg = "host",
+            cfg = "exec",
             mandatory = False,
         ),
         "clang": attr.label(
             doc = "The label of a `clang` executable.",
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
         "libclang": attr.label(
             doc = "A cc_library that provides bindgen's runtime dependency on libclang.",
-            cfg = "host",
+            cfg = "exec",
             providers = [CcInfo],
         ),
         "libstdcxx": attr.label(
             doc = "A cc_library that satisfies libclang's libstdc++ dependency.",
-            cfg = "host",
+            cfg = "exec",
             providers = [CcInfo],
         ),
     },

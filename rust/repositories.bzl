@@ -512,8 +512,7 @@ def _load_rust_compiler(ctx):
     return compiler_build_file
 
 def _load_rust_src(ctx):
-    """Loads the rust source code. This is used by the rust-analyzer rust-project.json
-    generator.
+    """Loads the rust source code. Used by the rust-analyzer rust-project.json generator.
 
     Args:
       ctx: A repository_ctx.

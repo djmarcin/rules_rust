@@ -45,23 +45,27 @@ RustTargetInfo = provider(
 # in a library or binary rule respectively.
 def fetch_crate_root_file(ctx):
   crate_root = ctx.rule.attr.crate_root
+  print("crate root from context: ", crate_root)
   if not crate_root:
     if len(ctx.rule.attr.srcs) == 1:
       crate_root = ctx.rule.attr.srcs[0]
+      print("crate root from 1: ", crate_root)
     else:
       for src in ctx.rule.attr.srcs:
         file_name = src.label.name
         crate_type = ctx.rule.attr.crate_type
+        print("crate root trying: ", src, " on crate type ", crate_type)
         if crate_type == "bin" and file_name.endswith("main.rs"):
           crate_root = src
           break
-        if crate_type == "rlib" or crate_type == "dylib":
+        if crate_type == "rlib" or crate_type == "dylib" or crate_type == "cdylib":
           if file_name.endswith("lib.rs"):
             crate_root = src
             break
   # The rules are structured such that the crate_root path will always be
   # the first element in the in the depset
-  crate_root = crate_root.files.to_list()[0].path
+  print("crate_root: ", crate_root, " files: ", crate_root.files.to_list()[0].path)
+  return crate_root.files.to_list()[0].path
 
 def _rust_project_aspect_impl(target, ctx):
   if ctx.rule.kind not in _rust_rules:
@@ -76,7 +80,14 @@ def _rust_project_aspect_impl(target, ctx):
 
   crate_name = ctx.rule.attr.name
 
+  print("_rust_project_aspect_impl: ", crate_name)
   crate_root = fetch_crate_root_file(ctx)
+  print("_rust_project_aspect_impl crate_root: ", crate_root)
+  if crate_root.startswith("external"):
+    crate_root = "/home/vagrant/.cache/bazel/_bazel_vagrant/71ed060a30795ab0736b520a305b19cd" + "/" + crate_root
+  else:
+    crate_root = "../" + crate_root
+  print("_rust_project_aspect_impl crate_root: ", crate_root)
 
   cfgs = []
   for feature in ctx.rule.attr.crate_features:
@@ -90,7 +101,7 @@ def _rust_project_aspect_impl(target, ctx):
 
   deps = [dep[RustTargetInfo] for dep in ctx.rule.attr.deps if RustTargetInfo in dep]
   transitive_deps = depset(direct = deps, transitive =
-      [dep[RustTargetInfo].transitive_deps for dep in ctx.rule.attr.deps])
+      [dep[RustTargetInfo].transitive_deps for dep in ctx.rule.attr.deps if RustTargetInfo in dep])
 
   return [RustTargetInfo(
       name = crate_name,
@@ -108,6 +119,7 @@ rust_project_aspect = aspect(
 )
 
 def create_crate(target):
+  print("create_crate: ", target.name, " ", target.root)
   crate = dict()
   crate["name"] = target.name
   crate["ID"] = "ID-" + target.name
@@ -154,13 +166,16 @@ def populate_sysroot(ctx, crate_mapping, output):
 
   root = ctx.attr.exec_root
   info = ctx.toolchains["@io_bazel_rules_rust//rust:toolchain"]
-
+  print("root: ", root, " info: ", info)
+  print("rustc_src: ", info.rustc_src, " label: ", info.rustc_src.label, "workspace_root: ", info.rustc_src.label.workspace_root)
+  print("rustc_lib: ", info.rustc_lib, " label: ", info.rustc_lib.label, "workspace_root: ", info.rustc_lib.label.workspace_root)
+  print("rust_lib: ", info.rust_lib, " label: ", info.rust_lib.label, "workspace_root: ", info.rust_lib.label.workspace_root)
   idx = 0
   for sysroot_crate in sysroot:
     crate = dict()
     crate["ID"] = "SYSROOT-" + sysroot_crate
     crate["name"] = sysroot_crate
-    crate["root_module"] =  root + "/" + info.rustc_src.label.workspace_root + "/src/lib" + sysroot_crate + "/lib.rs"
+    crate["root_module"] =  root + "/" + info.rust_lib.label.workspace_root + "/library/" + sysroot_crate + "/src/lib.rs"
     crate["edition"] = "2018"
     # sysroot crates are rarely modified. Mark as not a member of the workspace
     # for faster indexing
@@ -191,6 +206,7 @@ def _rust_project_impl(ctx):
 
   for target in ctx.attr.targets:
     for dep in target[RustTargetInfo].transitive_deps.to_list():
+      print("_rust_project_impl dep: ", dep.name)
       crate = create_crate(dep)
       crate_mapping[crate["ID"]] = idx
       idx += 1

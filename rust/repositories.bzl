@@ -520,21 +520,21 @@ def _load_rust_src(ctx):
     Returns:
       The BUILD file contents for this compiler and compiler library
     """
-    version = ctx.attr.version
+    tool_suburl = produce_tool_suburl("rustc", "src", ctx.attr.version, ctx.attr.iso_date)
     static_rust = ctx.os.environ["STATIC_RUST_URL"] if "STATIC_RUST_URL" in ctx.os.environ else "https://static.rust-lang.org"
-
-    tool_suburl = "rustc-{}-src".format(version)
     url = "{}/dist/{}.tar.gz".format(static_rust, tool_suburl)
-    archive_path = tool_suburl + ".tar.gz"
+
+    tool_path = produce_tool_path("rustc", "src", ctx.attr.version)
+    archive_path = tool_path + ".tar.gz"
     ctx.download(
         url,
         output = archive_path,
-        sha256 = FILE_KEY_TO_SHA.get(tool_suburl),
+        sha256 = ctx.attr.sha256s.get(tool_suburl) or FILE_KEY_TO_SHA.get(tool_suburl),
     )
     ctx.extract(
-      archive_path,
-      output = "src",
-      stripPrefix = "{}/src".format(tool_suburl),
+        archive_path,
+        output = "",
+        stripPrefix = tool_path,
     )
     return BUILD_for_rustc_src()
 

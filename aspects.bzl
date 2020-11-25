@@ -20,6 +20,7 @@ given targets. This file can be consumed by rust-analyzer as an alternative
 to Cargo.toml files.
 """
 
+load("@io_bazel_rules_rust//rust:private/rustc.bzl", "BuildInfo")
 load("@io_bazel_rules_rust//rust:private/utils.bzl", "find_toolchain")
 
 # We support only these rule kinds.
@@ -53,13 +54,16 @@ def fetch_crate_root_file(ctx):
             for src in ctx.rule.attr.srcs:
                 file_name = src.label.name
                 crate_type = ctx.rule.attr.crate_type
-                if crate_type == "bin" and file_name.endswith("main.rs"):
-                    crate_root = src
-                    break
-                if crate_type == "rlib" or crate_type == "dylib" or crate_type == "cdylib":
+                if crate_type == "bin":
+                    if file_name.endswith("main.rs"):
+                        crate_root = src
+                        break
+                elif crate_type in ("rlib", "dylib", "cdylib", "staticlib", "proc-macro"):
                     if file_name.endswith("lib.rs"):
                         crate_root = src
                         break
+                else:
+                   print("MISSED CRATE TYPE: ", crate_type)
 
     # The rules are structured such that the crate_root path will always be
     # the first element in the in the depset
@@ -88,13 +92,21 @@ def _rust_project_aspect_impl(target, ctx):
         # config, not key/value
         if flag.startswith("--cfg"):
             cfgs.append(flag[6:])
-    env = ctx.rule.attr.rustc_env
+
+    env = {}
+    for dep in ctx.rule.attr.deps:
+        if BuildInfo in dep:
+            env.update({
+                "OUT_DIR": "../" + dep[BuildInfo].out_dir.path,
+            })
+    env.update(ctx.rule.attr.rustc_env)
 
     deps = [dep[RustTargetInfo] for dep in ctx.rule.attr.deps if RustTargetInfo in dep]
+    deps += [dep[RustTargetInfo] for dep in ctx.rule.attr.proc_macro_deps if RustTargetInfo in dep]
     transitive_deps = depset(
         direct = deps,
         order = "postorder",
-        transitive = [dep[RustTargetInfo].transitive_deps for dep in ctx.rule.attr.deps if RustTargetInfo in dep],
+        transitive = [dep.transitive_deps for dep in deps],
     )
 
     return [RustTargetInfo(
@@ -108,7 +120,7 @@ def _rust_project_aspect_impl(target, ctx):
     )]
 
 rust_project_aspect = aspect(
-    attr_aspects = ["deps"],
+    attr_aspects = ["deps", "proc_macro_deps"],
     implementation = _rust_project_aspect_impl,
     toolchains = ["@io_bazel_rules_rust//rust:toolchain"],
 )

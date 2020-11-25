@@ -750,12 +750,16 @@ def _create_extra_input_args(ctx, file, build_info, dep_info):
     build_flags_files = []
 
     if build_info:
+        # print("BUILD INFO: ", build_info)
         out_dir = build_info.out_dir.path
+        # print("out_dir: ", out_dir)
         build_env_file = build_info.rustc_env.path
+        # print("build_env_file: ", build_env_file)
         build_flags_files.append(build_info.flags.path)
         build_flags_files.append(build_info.link_flags.path)
         input_files.append(build_info.out_dir)
         input_files.append(build_info.link_flags)
+        
 
     return input_files, out_dir, build_env_file, build_flags_files
 

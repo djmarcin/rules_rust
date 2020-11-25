@@ -34,6 +34,11 @@ load(
     _rust_clippy = "rust_clippy",
     _rust_clippy_aspect = "rust_clippy_aspect",
 )
+load(
+    "@io_bazel_rules_rust//rust:private/rust_analyzer.bzl",
+    _rust_analyzer = "rust_analyzer",
+    _rust_analyzer_aspect = "rust_analyzer_aspect",
+)
 
 rust_library = _rust_library
 # See @io_bazel_rules_rust//rust:private/rust.bzl for a complete description.
@@ -61,3 +66,9 @@ rust_clippy_aspect = _rust_clippy_aspect
 
 rust_clippy = _rust_clippy
 # See @io_bazel_rules_rust//rust:private/clippy.bzl for a complete description.
+
+rust_analyzer_aspect = _rust_analyzer_aspect
+# See @io_bazel_rules_rust//rust:private/rust_analyzer.bzl for a complete description.
+
+rust_analyzer = _rust_analyzer
+# See @io_bazel_rules_rust//rust:private/rust_analyzer.bzl for a complete description.

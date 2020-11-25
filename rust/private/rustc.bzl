@@ -65,7 +65,7 @@ AliasableDepInfo = provider(
 )
 
 DepInfo = provider(
-    doc = "A provider contianing information about a Crate's dependencies.",
+    doc = "A provider containing information about a Crate's dependencies.",
     fields = {
         "direct_crates": "depset[CrateInfo]",
         "transitive_crates": "depset[CrateInfo]",

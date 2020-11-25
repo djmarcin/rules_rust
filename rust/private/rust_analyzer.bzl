@@ -20,7 +20,7 @@ given targets. This file can be consumed by rust-analyzer as an alternative
 to Cargo.toml files.
 """
 
-load("@io_bazel_rules_rust//rust:private/rustc.bzl", "BuildInfo")
+load("@io_bazel_rules_rust//rust:private/rustc.bzl", "BuildInfo", "CrateInfo")
 load("@io_bazel_rules_rust//rust:private/utils.bzl", "find_toolchain")
 
 # We support only these rule kinds.
@@ -29,60 +29,22 @@ _rust_rules = [
     "rust_binary",
 ]
 
-RustTargetInfo = provider(
-    "RustTargetInfo holds rust crate metadata for targets",
+RustAnalyzerInfo = provider(
+    "RustAnalyzerInfo holds rust crate metadata for targets",
     fields = {
-        "name": "target name",
-        "root": "crate root",
-        "edition": "edition",
-        "deps": "dependencies",
-        "transitive_deps": "closure of all transitive dependencies",
-        "cfgs": "compilation cfgs",
-        "env": "Environment variables, used for the `env!` macro",
+        "crate": "CrateInfo",
+        "deps": "List[RustAnalyzerInfo]: direct dependencies",
+        "transitive_deps": "List[RustAnalyzerInfo]: transitive closure of dependencies",
+        "cfgs": "List[String]: features or other compilation --cfg= settings",
+        "env": "Dict{String: String}: Environment variables, used for the `env!` macro",
     },
 )
 
-# Gets the crate_root file from the context.
-# If the file is not specified, find lib.rs or main.rs
-# in a library or binary rule respectively.
-def fetch_crate_root_file(ctx):
-    crate_root = ctx.rule.attr.crate_root
-    if not crate_root:
-        if len(ctx.rule.attr.srcs) == 1:
-            crate_root = ctx.rule.attr.srcs[0]
-        else:
-            for src in ctx.rule.attr.srcs:
-                file_name = src.label.name
-                crate_type = ctx.rule.attr.crate_type
-                if crate_type == "bin":
-                    if file_name.endswith("main.rs"):
-                        crate_root = src
-                        break
-                elif crate_type in ("rlib", "dylib", "cdylib", "staticlib", "proc-macro"):
-                    if file_name.endswith("lib.rs"):
-                        crate_root = src
-                        break
-                else:
-                   print("MISSED CRATE TYPE: ", crate_type)
-
-    # The rules are structured such that the crate_root path will always be
-    # the first element in the in the depset
-    return crate_root.files.to_list()[0].path
-
-def _rust_project_aspect_impl(target, ctx):
-    if ctx.rule.kind not in _rust_rules:
+def _rust_analyzer_aspect_impl(target, ctx):
+    if CrateInfo not in target:
         return []
 
     toolchain = find_toolchain(ctx)
-
-    # extract the crate_root path
-    edition = ctx.rule.attr.edition
-    if not edition:
-        edition = toolchain.default_edition
-
-    crate_name = ctx.rule.attr.name
-
-    crate_root = fetch_crate_root_file(ctx)
 
     cfgs = []
     for feature in ctx.rule.attr.crate_features:
@@ -94,80 +56,87 @@ def _rust_project_aspect_impl(target, ctx):
             cfgs.append(flag[6:])
 
     env = {}
+
+    # If one of our deps is a cargo_build_script, set OUT_DIR.
     for dep in ctx.rule.attr.deps:
         if BuildInfo in dep:
             env.update({
                 "OUT_DIR": "../" + dep[BuildInfo].out_dir.path,
             })
+
+    # Add rest of rustc_env
     env.update(ctx.rule.attr.rustc_env)
 
-    deps = [dep[RustTargetInfo] for dep in ctx.rule.attr.deps if RustTargetInfo in dep]
-    deps += [dep[RustTargetInfo] for dep in ctx.rule.attr.proc_macro_deps if RustTargetInfo in dep]
-    transitive_deps = depset(
-        direct = deps,
-        order = "postorder",
-        transitive = [dep.transitive_deps for dep in deps],
-    )
+    deps = [dep[RustAnalyzerInfo] for dep in (ctx.rule.attr.deps + ctx.rule.attr.proc_macro_deps) if RustAnalyzerInfo in dep]
+    transitive_deps = depset(direct = deps, order = "postorder", transitive = [dep.transitive_deps for dep in deps])
 
-    return [RustTargetInfo(
-        name = crate_name,
-        edition = edition,
+    return [RustAnalyzerInfo(
+        crate = target[CrateInfo],
         cfgs = cfgs,
-        root = crate_root,
         env = env,
         deps = deps,
         transitive_deps = transitive_deps,
     )]
 
-rust_project_aspect = aspect(
+rust_analyzer_aspect = aspect(
     attr_aspects = ["deps", "proc_macro_deps"],
-    implementation = _rust_project_aspect_impl,
+    implementation = _rust_analyzer_aspect_impl,
     toolchains = ["@io_bazel_rules_rust//rust:toolchain"],
 )
 
-def create_crate(ctx, target, crate_mapping):
+def create_crate(ctx, info, crate_mapping):
     crate = dict()
-    crate["name"] = target.name
-    crate["edition"] = target.edition
-    if target.root.startswith("external"):
-        crate["root_module"] = ctx.attr.exec_root + "/" + target.root
+    crate["name"] = info.crate.name
+    crate["edition"] = info.crate.edition
+    if info.crate.root.path.startswith("external"):
+        crate["root_module"] = ctx.attr.exec_root + "/" + info.crate.root.path
         crate["is_workspace_member"] = False
     else:
-        crate["root_module"] = "../" + target.root
+        crate["root_module"] = "../" + info.crate.root.path
         crate["is_workspace_member"] = True
 
     deps = []
-    for dep in target.deps:
+    for dep in info.deps:
         deps.append({
-            "name": dep.name,
-            "crate": crate_mapping["ID-" + dep.root],
+            "name": dep.crate.name,
+            "crate": crate_mapping["ID-" + dep.crate.root.path],
         })
 
     crate["deps"] = deps
-    crate["cfg"] = target.cfgs
-    crate["env"] = target.env
-    return "ID-" + target.root, crate
+    crate["cfg"] = info.cfgs
+    crate["env"] = info.env
+    return "ID-" + info.crate.root.path, crate
 
+# This implementation is incomplete because in order to get rustc env vars we
+# would need to actually execute the build graph and gather the output of
+# cargo_build_script rules. This would require a genrule to actually construct
+# the JSON, rather than being able to build it completly in starlark.
+# TODO(djmarcin): Run the cargo_build_scripts to gather env vars correctly.
 def _rust_project_impl(ctx):
-    output = dict()
     rust_toolchain = find_toolchain(ctx)
+    crate_mapping = dict()
+
+    output = dict()
     output["sysroot_src"] = ctx.attr.exec_root + "/" + rust_toolchain.rust_lib.label.workspace_root + "/library"
     output["crates"] = []
 
-    crate_mapping = dict()
-
+    # Gather all crates and their dependencies into an array.
+    # Dependencies are referenced by index, so leaves should come first.
     idx = 0
     for target in ctx.attr.targets:
-        # Add our transitive dependencies
-        for dep in target[RustTargetInfo].transitive_deps.to_list():
-            crate_id, crate = create_crate(ctx, dep, crate_mapping)
+        if RustAnalyzerInfo not in target:
+            continue
+
+        # Add this crate's transitive deps to the crate mapping and output.
+        for dep_info in target[RustAnalyzerInfo].transitive_deps.to_list():
+            crate_id, crate = create_crate(ctx, dep_info, crate_mapping)
             if crate_id not in crate_mapping:
                 crate_mapping[crate_id] = idx
                 idx += 1
                 output["crates"].append(crate)
 
         # Add this crate to the crate mapping and output.
-        crate_id, crate = create_crate(ctx, target[RustTargetInfo], crate_mapping)
+        crate_id, crate = create_crate(ctx, target[RustAnalyzerInfo], crate_mapping)
         if crate_id not in crate_mapping:
             crate_mapping[crate_id] = idx
             idx += 1
@@ -178,7 +147,7 @@ def _rust_project_impl(ctx):
 rust_analyzer = rule(
     attrs = {
         "targets": attr.label_list(
-            aspects = [rust_project_aspect],
+            aspects = [rust_analyzer_aspect],
             doc = "List of all targets to be included in the index",
         ),
         "exec_root": attr.string(

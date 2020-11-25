@@ -14,13 +14,6 @@ BETA_ISO_DATES="$(cat ./util/fetch_shas_BETA_ISO_DATES.txt)"
 NIGHTLY_ISO_DATES="$(cat ./util/fetch_shas_NIGHTLY_ISO_DATES.txt)"
 RUSTFMT_VERSIONS="$(cat ./util/fetch_shas_RUSTFMT_VERSIONS.txt)"
 
-enumerate_rust_src_keys() {
-  for VERSION in $VERSIONS
-  do
-    echo "rustc-$VERSION-src"
-  done
-}
-
 enumerate_keys() {
   for TOOL in $TOOLS
   do

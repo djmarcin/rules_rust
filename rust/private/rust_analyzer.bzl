@@ -85,6 +85,16 @@ rust_analyzer_aspect = aspect(
 )
 
 def create_crate(ctx, info, crate_mapping):
+    """Creates a crate in the rust-project.json format
+
+    Args:
+        ctx: The rule context from which the exec_root can be retrieved
+        info: The crate RustAnalyzerInfo for the current crate
+        crate_mapping: The mapping of crates to ids for dependency memoization
+
+    Returns:
+        Tuple containing this crate's ID and the crate rust-project representation
+    """
     crate = dict()
     crate["name"] = info.crate.name
     crate["edition"] = info.crate.edition
@@ -117,7 +127,7 @@ def _rust_project_impl(ctx):
     crate_mapping = dict()
 
     output = dict()
-    output["sysroot_src"] = ctx.attr.exec_root + "/" + rust_toolchain.rust_lib.label.workspace_root + "/library"
+    output["sysroot_src"] = ctx.attr.exec_root + "/" + rust_toolchain.rust_lib.label.workspace_root + "/rustc-src/library"
     output["crates"] = []
 
     # Gather all crates and their dependencies into an array.

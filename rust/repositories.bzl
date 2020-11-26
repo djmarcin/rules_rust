@@ -273,7 +273,7 @@ filegroup(
     name = "rustc_src",
     srcs = glob(
         [
-            "rustc-src/**/*.rs",
+            "lib/rustlib/src/**/*.rs",
         ],
     ),
     visibility = ["//visibility:public"],
@@ -532,7 +532,7 @@ def _load_rust_src(ctx):
     )
     ctx.extract(
         archive_path,
-        output = "rustc-src",
+        output = "lib/rustlib/src",
         stripPrefix = tool_path,
     )
     return BUILD_for_rustc_src()

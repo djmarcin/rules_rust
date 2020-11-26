@@ -22,6 +22,7 @@ to Cargo.toml files.
 
 load("@io_bazel_rules_rust//rust:private/rustc.bzl", "BuildInfo", "CrateInfo")
 load("@io_bazel_rules_rust//rust:private/utils.bzl", "find_toolchain")
+load("//rust/platform:triple_mappings.bzl", "system_to_dylib_ext", "triple_to_system")
 
 # We support only these rule kinds.
 _rust_rules = [
@@ -37,6 +38,8 @@ RustAnalyzerInfo = provider(
         "transitive_deps": "List[RustAnalyzerInfo]: transitive closure of dependencies",
         "cfgs": "List[String]: features or other compilation --cfg= settings",
         "env": "Dict{String: String}: Environment variables, used for the `env!` macro",
+        "proc_macro_dylib_path": "File: compiled shared library output of proc-macro rule",
+        "build_info": "BuildInfo: build info for this crate if present"
     },
 )
 
@@ -58,11 +61,10 @@ def _rust_analyzer_aspect_impl(target, ctx):
     env = {}
 
     # If one of our deps is a cargo_build_script, set OUT_DIR.
+    build_info = None
     for dep in ctx.rule.attr.deps:
         if BuildInfo in dep:
-            env.update({
-                "OUT_DIR": "../" + dep[BuildInfo].out_dir.path,
-            })
+            build_info = dep[BuildInfo]
 
     # Add rest of rustc_env
     env.update(ctx.rule.attr.rustc_env)
@@ -70,12 +72,23 @@ def _rust_analyzer_aspect_impl(target, ctx):
     deps = [dep[RustAnalyzerInfo] for dep in (ctx.rule.attr.deps + ctx.rule.attr.proc_macro_deps) if RustAnalyzerInfo in dep]
     transitive_deps = depset(direct = deps, order = "postorder", transitive = [dep.transitive_deps for dep in deps])
 
+    crate_info = target[CrateInfo]
+    proc_macro_dylib_path = None
+    if crate_info.type == "proc-macro":
+        dylib_ext = system_to_dylib_ext(triple_to_system(toolchain.target_triple))
+        for action in target.actions:
+            for output in action.outputs.to_list():
+                if '.' + output.extension == dylib_ext:
+                    proc_macro_dylib_path = output.path
+
     return [RustAnalyzerInfo(
-        crate = target[CrateInfo],
+        crate = crate_info,
         cfgs = cfgs,
         env = env,
         deps = deps,
         transitive_deps = transitive_deps,
+        proc_macro_dylib_path = proc_macro_dylib_path,
+        build_info = build_info,
     )]
 
 rust_analyzer_aspect = aspect(
@@ -98,12 +111,19 @@ def create_crate(ctx, info, crate_mapping):
     crate = dict()
     crate["name"] = info.crate.name
     crate["edition"] = info.crate.edition
+    crate["env"] = {}
+
     if info.crate.root.path.startswith("external"):
-        crate["root_module"] = ctx.attr.exec_root + "/" + info.crate.root.path
         crate["is_workspace_member"] = False
+        crate["root_module"] = ctx.attr.exec_root + "/" + info.crate.root.path
     else:
-        crate["root_module"] = "../" + info.crate.root.path
         crate["is_workspace_member"] = True
+        crate["root_module"] = "/home/vagrant/metawork/" + info.crate.root.path
+        # Set CARGO_MANIFEST_DIR for local workspace crates
+        crate["env"].update({ "CARGO_MANIFEST_DIR": "/home/vagrant/metawork/" + info.crate.root.dirname + "/../" })
+    if info.build_info != None:
+        crate["env"].update({ "OUT_DIR": ctx.attr.exec_root + "/" + info.build_info.out_dir.path })
+    crate["env"].update(info.env)
 
     deps = []
     for dep in info.deps:
@@ -114,7 +134,9 @@ def create_crate(ctx, info, crate_mapping):
 
     crate["deps"] = deps
     crate["cfg"] = info.cfgs
-    crate["env"] = info.env
+    crate["target"] = find_toolchain(ctx).target_triple
+    if info.proc_macro_dylib_path != None:
+        crate["proc_macro_dylib_path"] = ctx.attr.exec_root + "/" + info.proc_macro_dylib_path
     return "ID-" + info.crate.root.path, crate
 
 # This implementation is incomplete because in order to get rustc env vars we
@@ -127,7 +149,7 @@ def _rust_project_impl(ctx):
     crate_mapping = dict()
 
     output = dict()
-    output["sysroot_src"] = ctx.attr.exec_root + "/" + rust_toolchain.rust_lib.label.workspace_root + "/rustc-src/library"
+    output["sysroot_src"] = ctx.attr.exec_root + "/" + rust_toolchain.rust_lib.label.workspace_root + "/lib/rustlib/src/library"
     output["crates"] = []
 
     # Gather all crates and their dependencies into an array.

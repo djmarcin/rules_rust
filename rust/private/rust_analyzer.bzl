@@ -39,7 +39,7 @@ RustAnalyzerInfo = provider(
         "cfgs": "List[String]: features or other compilation --cfg= settings",
         "env": "Dict{String: String}: Environment variables, used for the `env!` macro",
         "proc_macro_dylib_path": "File: compiled shared library output of proc-macro rule",
-        "build_info": "BuildInfo: build info for this crate if present"
+        "build_info": "BuildInfo: build info for this crate if present",
     },
 )
 
@@ -78,7 +78,7 @@ def _rust_analyzer_aspect_impl(target, ctx):
         dylib_ext = system_to_dylib_ext(triple_to_system(toolchain.target_triple))
         for action in target.actions:
             for output in action.outputs.to_list():
-                if '.' + output.extension == dylib_ext:
+                if "." + output.extension == dylib_ext:
                     proc_macro_dylib_path = output.path
 
     return [RustAnalyzerInfo(
@@ -113,16 +113,26 @@ def create_crate(ctx, info, crate_mapping):
     crate["edition"] = info.crate.edition
     crate["env"] = {}
 
-    if info.crate.root.path.startswith("external"):
+    # Switch on external/ to determine if crates are in the workspace or remote.
+    # TODO: Some folks may want to override this for vendored dependencies.
+    if info.crate.root.path.startswith("external/"):
         crate["is_workspace_member"] = False
         crate["root_module"] = ctx.attr.exec_root + "/" + info.crate.root.path
+        crate_root = ctx.attr.exec_root + "/" + info.crate.root.dirname + "/../"
     else:
         crate["is_workspace_member"] = True
-        crate["root_module"] = "/home/vagrant/metawork/" + info.crate.root.path
+        crate["root_module"] = "../" + info.crate.root.path
+        crate_root = "../" + info.crate.root.dirname + "/../"
+
         # Set CARGO_MANIFEST_DIR for local workspace crates
-        crate["env"].update({ "CARGO_MANIFEST_DIR": "/home/vagrant/metawork/" + info.crate.root.dirname + "/../" })
+        crate["env"].update({"CARGO_MANIFEST_DIR": crate_root})
     if info.build_info != None:
-        crate["env"].update({ "OUT_DIR": ctx.attr.exec_root + "/" + info.build_info.out_dir.path })
+        crate["env"].update({"OUT_DIR": ctx.attr.exec_root + "/" + info.build_info.out_dir.path})
+        crate["source"] = {
+            # We have to tell rust-analyzer about our out_dir since it's not under the crate root.
+            "include_dirs": [crate_root, ctx.attr.exec_root + "/" + info.build_info.out_dir.path],
+            "exclude_dirs": [],
+        }
     crate["env"].update(info.env)
 
     deps = []

@@ -1,11 +1,11 @@
 load(
     "@io_bazel_rules_rust//rust:rust.bzl",
+    "rust_analyzer",
     "rust_doc",
     "rust_doc_test",
     "rust_library",
     "rust_test",
 )
-load("@io_bazel_rules_rust//:aspects.bzl", "rust_analyzer")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -89,6 +89,6 @@ rust_doc_test(
 
 rust_analyzer(
     name = "hello_rust_analyzer",
-    targets = [ ":hello_lib" ],
-    exec_root = "bazel-rules_rust"
+    exec_root = "bazel-rules_rust",
+    targets = [":hello_lib"],
 )

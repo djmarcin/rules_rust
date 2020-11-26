@@ -120,9 +120,11 @@ def create_crate(ctx, info, crate_mapping):
         crate["root_module"] = ctx.attr.exec_root + "/" + info.crate.root.path
         crate_root = ctx.attr.exec_root + "/" + info.crate.root.dirname + "/../"
     else:
+        # Compute the number of ../ we need for relative paths.
+        rule_depth = ctx.build_file_path.count('/') + 1
         crate["is_workspace_member"] = True
-        crate["root_module"] = "../" + info.crate.root.path
-        crate_root = "../" + info.crate.root.dirname + "/../"
+        crate["root_module"] = "../" * rule_depth + info.crate.root.path
+        crate_root = "../" * rule_depth + info.crate.root.dirname + "/../"
 
         # Set CARGO_MANIFEST_DIR for local workspace crates
         crate["env"].update({"CARGO_MANIFEST_DIR": crate_root})

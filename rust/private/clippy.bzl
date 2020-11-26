@@ -87,7 +87,7 @@ def _clippy_aspect_impl(target, ctx):
         crate_info,
         dep_info,
         output_hash = determine_output_hash(root),
-        rust_flags = ["--error-format=json"],
+        rust_flags = [],
         out_dir = out_dir,
         build_env_file = build_env_file,
         build_flags_files = build_flags_files,

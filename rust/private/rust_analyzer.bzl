@@ -31,12 +31,12 @@ _rust_rules = [
 ]
 
 RustAnalyzerInfo = provider(
-    "RustAnalyzerInfo holds rust crate metadata for targets",
+    doc = "RustAnalyzerInfo holds rust crate metadata for targets",
     fields = {
         "crate": "CrateInfo",
         "deps": "List[RustAnalyzerInfo]: direct dependencies",
         "transitive_deps": "List[RustAnalyzerInfo]: transitive closure of dependencies",
-        "cfgs": "List[String]: features or other compilation --cfg= settings",
+        "cfgs": "List[String]: features or other compilation --cfg settings",
         "env": "Dict{String: String}: Environment variables, used for the `env!` macro",
         "proc_macro_dylib_path": "File: compiled shared library output of proc-macro rule",
         "build_info": "BuildInfo: build info for this crate if present",
@@ -55,7 +55,7 @@ def _rust_analyzer_aspect_impl(target, ctx):
     for flag in ctx.rule.attr.rustc_flags:
         # --cfg flags should be passed as well but as an atomic
         # config, not key/value
-        if flag.startswith("--cfg"):
+        if flag.startswith("--cfg ") or flag.startswith("--cfg="):
             cfgs.append(flag[6:])
 
     env = {}
@@ -95,15 +95,16 @@ rust_analyzer_aspect = aspect(
     attr_aspects = ["deps", "proc_macro_deps"],
     implementation = _rust_analyzer_aspect_impl,
     toolchains = ["@io_bazel_rules_rust//rust:toolchain"],
+    doc = "Annotates rust rules with RustAnalyzerInfo later used to build a rust-project.json"
 )
 
 def create_crate(ctx, info, crate_mapping):
     """Creates a crate in the rust-project.json format
 
     Args:
-        ctx: The rule context from which the exec_root can be retrieved
-        info: The crate RustAnalyzerInfo for the current crate
-        crate_mapping: The mapping of crates to ids for dependency memoization
+        ctx (ctx): The rule context from which the exec_root can be retrieved
+        info (RustAnalyzerInfo): The crate RustAnalyzerInfo for the current crate
+        crate_mapping (dict): A dict of {String:Int} that memoizes crates for deps.
 
     Returns:
         Tuple containing this crate's ID and the crate rust-project representation
@@ -184,6 +185,7 @@ def _rust_project_impl(ctx):
             idx += 1
             output["crates"].append(crate)
 
+    # TODO(djmarcin): Use json module once bazel 4.0 is released.
     ctx.actions.write(output = ctx.outputs.filename, content = struct(**output).to_json())
 
 rust_analyzer = rule(
@@ -202,4 +204,5 @@ rust_analyzer = rule(
     },
     implementation = _rust_project_impl,
     toolchains = ["@io_bazel_rules_rust//rust:toolchain"],
+    doc = "Produces a rust-project.json for the given targets. Configure rust-analyzer to load the generated file via the linked projects mechanism."
 )

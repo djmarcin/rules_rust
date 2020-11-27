@@ -40,6 +40,8 @@ load(
     _rust_doc_test = "rust_doc_test",
     _rust_library = "rust_library",
     _rust_test = "rust_test",
+    _rust_clippy = "rust_clippy",
+    _rust_analyzer = "rust_analyzer",
 )
 load(
     "@io_bazel_rules_rust//rust:toolchain.bzl",
@@ -86,3 +88,7 @@ rust_toolchain_repository = _rust_toolchain_repository
 rust_toolchain_repository_proxy = _rust_toolchain_repository_proxy
 
 rust_workspace = _rust_workspace
+
+rust_clippy = _rust_clippy
+rust_analyzer = _rust_analyzer
+

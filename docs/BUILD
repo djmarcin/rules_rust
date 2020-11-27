@@ -63,6 +63,14 @@ PAGES = {
     "rust_workspace": [
         "rust_workspace",
     ],
+    "rust_clippy": [
+        "rust_clippy",
+        "rust_clippy_aspect",
+    ],
+    "rust_analyzer": [
+        "rust_analyzer",
+        "rust_analyzer_aspect",
+    ]
 }
 
 [

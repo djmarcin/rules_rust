@@ -1,11 +1,15 @@
 # Rust rules
 
 * [cargo_build_script](#cargo_build_script)
+* [rust_analyzer](#rust_analyzer)
+* [rust_analyzer_aspect](#rust_analyzer_aspect)
 * [rust_benchmark](#rust_benchmark)
 * [rust_binary](#rust_binary)
 * [rust_bindgen](#rust_bindgen)
 * [rust_bindgen_library](#rust_bindgen_library)
 * [rust_bindgen_toolchain](#rust_bindgen_toolchain)
+* [rust_clippy](#rust_clippy)
+* [rust_clippy_aspect](#rust_clippy_aspect)
 * [rust_doc](#rust_doc)
 * [rust_doc_test](#rust_doc_test)
 * [rust_grpc_library](#rust_grpc_library)
@@ -21,6 +25,26 @@
 * [rust_wasm_bindgen](#rust_wasm_bindgen)
 * [rust_wasm_bindgen_toolchain](#rust_wasm_bindgen_toolchain)
 * [rust_workspace](#rust_workspace)
+
+
+<a id="#rust_analyzer"></a>
+
+## rust_analyzer
+
+<pre>
+rust_analyzer(<a href="#rust_analyzer-name">name</a>, <a href="#rust_analyzer-exec_root">exec_root</a>, <a href="#rust_analyzer-targets">targets</a>)
+</pre>
+
+Produces a rust-project.json for the given targets. Configure rust-analyzer to load the generated file via the linked projects mechanism.
+
+**ATTRIBUTES**
+
+
+| Name  | Description | Type | Mandatory | Default |
+| :------------- | :------------- | :------------- | :------------- | :------------- |
+| <a id="rust_analyzer-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/docs/build-ref.html#name">Name</a> | required |  |
+| <a id="rust_analyzer-exec_root"></a>exec_root |  Execution root of Bazel as returned by 'bazel info execution_root'.   | String | required |  |
+| <a id="rust_analyzer-targets"></a>targets |  List of all targets to be included in the index   | <a href="https://bazel.build/docs/build-ref.html#labels">List of labels</a> | optional | [] |
 
 
 <a id="#rust_benchmark"></a>
@@ -288,6 +312,60 @@ The tools required for the `rust_bindgen` rule.
 | <a id="rust_bindgen_toolchain-libclang"></a>libclang |  A cc_library that provides bindgen's runtime dependency on libclang.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
 | <a id="rust_bindgen_toolchain-libstdcxx"></a>libstdcxx |  A cc_library that satisfies libclang's libstdc++ dependency.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
 | <a id="rust_bindgen_toolchain-rustfmt"></a>rustfmt |  The label of a <code>rustfmt</code> executable. If this is provided, generated sources will be formatted.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
+
+
+<a id="#rust_clippy"></a>
+
+## rust_clippy
+
+<pre>
+rust_clippy(<a href="#rust_clippy-name">name</a>, <a href="#rust_clippy-deps">deps</a>)
+</pre>
+
+Executes the clippy checker on a specific target.
+
+Similar to `rust_clippy_aspect`, but allows specifying a list of dependencies within the build system.
+
+For example, given the following example targets:
+
+```python
+package(default_visibility = ["//visibility:public"])
+
+load("@io_bazel_rules_rust//rust:rust.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "hello_lib",
+    srcs = ["src/lib.rs"],
+)
+
+rust_test(
+    name = "greeting_test",
+    srcs = ["tests/greeting.rs"],
+    deps = [":hello_lib"],
+)
+```
+
+Rust clippy can be set as a build target with the following:
+
+```python
+rust_clippy(
+    name = "hello_library_clippy",
+    testonly = True,
+    deps = [
+        ":hello_lib",
+        ":greeting_test",
+    ],
+)
+```
+
+
+**ATTRIBUTES**
+
+
+| Name  | Description | Type | Mandatory | Default |
+| :------------- | :------------- | :------------- | :------------- | :------------- |
+| <a id="rust_clippy-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/docs/build-ref.html#name">Name</a> | required |  |
+| <a id="rust_clippy-deps"></a>deps |  -   | <a href="https://bazel.build/docs/build-ref.html#labels">List of labels</a> | optional | [] |
 
 
 <a id="#rust_doc"></a>
@@ -804,7 +882,7 @@ Run the test with `bazel build //hello_lib:hello_lib_test`.
 
 <pre>
 rust_toolchain(<a href="#rust_toolchain-name">name</a>, <a href="#rust_toolchain-binary_ext">binary_ext</a>, <a href="#rust_toolchain-cargo">cargo</a>, <a href="#rust_toolchain-clippy_driver">clippy_driver</a>, <a href="#rust_toolchain-debug_info">debug_info</a>, <a href="#rust_toolchain-default_edition">default_edition</a>, <a href="#rust_toolchain-dylib_ext">dylib_ext</a>,
-               <a href="#rust_toolchain-exec_triple">exec_triple</a>, <a href="#rust_toolchain-opt_level">opt_level</a>, <a href="#rust_toolchain-os">os</a>, <a href="#rust_toolchain-rust_doc">rust_doc</a>, <a href="#rust_toolchain-rust_lib">rust_lib</a>, <a href="#rust_toolchain-rustc">rustc</a>, <a href="#rust_toolchain-rustc_lib">rustc_lib</a>, <a href="#rust_toolchain-rustfmt">rustfmt</a>,
+               <a href="#rust_toolchain-exec_triple">exec_triple</a>, <a href="#rust_toolchain-opt_level">opt_level</a>, <a href="#rust_toolchain-os">os</a>, <a href="#rust_toolchain-rust_doc">rust_doc</a>, <a href="#rust_toolchain-rust_lib">rust_lib</a>, <a href="#rust_toolchain-rustc">rustc</a>, <a href="#rust_toolchain-rustc_lib">rustc_lib</a>, <a href="#rust_toolchain-rustc_src">rustc_src</a>, <a href="#rust_toolchain-rustfmt">rustfmt</a>,
                <a href="#rust_toolchain-staticlib_ext">staticlib_ext</a>, <a href="#rust_toolchain-stdlib_linkflags">stdlib_linkflags</a>, <a href="#rust_toolchain-target_triple">target_triple</a>)
 </pre>
 
@@ -868,6 +946,7 @@ See @io_bazel_rules_rust//rust:repositories.bzl for examples of defining the @ru
 | <a id="rust_toolchain-rust_lib"></a>rust_lib |  The rust standard library.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
 | <a id="rust_toolchain-rustc"></a>rustc |  The location of the <code>rustc</code> binary. Can be a direct source or a filegroup containing one item.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
 | <a id="rust_toolchain-rustc_lib"></a>rustc_lib |  The libraries used by rustc during compilation.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
+| <a id="rust_toolchain-rustc_src"></a>rustc_src |  The source code of rustc.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
 | <a id="rust_toolchain-rustfmt"></a>rustfmt |  The location of the <code>rustfmt</code> binary. Can be a direct source or a filegroup containing one item.   | <a href="https://bazel.build/docs/build-ref.html#labels">Label</a> | optional | None |
 | <a id="rust_toolchain-staticlib_ext"></a>staticlib_ext |  The extension for static libraries created from rustc.   | String | required |  |
 | <a id="rust_toolchain-stdlib_linkflags"></a>stdlib_linkflags |  Additional linker libs used when std lib is linked, see https://github.com/rust-lang/rust/blob/master/src/libstd/build.rs   | List of strings | required |  |
@@ -1045,7 +1124,7 @@ The `hello_lib` target will be build with the flags and the environment variable
 | <a id="cargo_build_script-deps"></a>deps |  The dependencies of the crate defined by <code>crate_name</code>.   |  <code>[]</code> |
 | <a id="cargo_build_script-build_script_env"></a>build_script_env |  Environment variables for build scripts.   |  <code>{}</code> |
 | <a id="cargo_build_script-data"></a>data |  Files or tools needed by the build script.   |  <code>[]</code> |
-| <a id="cargo_build_script-links"></a>links |  <p align="center"> - </p>   |  <code>None</code> |
+| <a id="cargo_build_script-links"></a>links |  Name of the native library this crate links against.   |  <code>None</code> |
 | <a id="cargo_build_script-kwargs"></a>kwargs |  Forwards to the underlying <code>rust_binary</code> rule.   |  none |
 
 

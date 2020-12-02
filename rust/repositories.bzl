@@ -515,9 +515,9 @@ def _load_rust_src(ctx):
     """Loads the rust source code. Used by the rust-analyzer rust-project.json generator.
 
     Args:
-        ctx: A repository_ctx.
+        ctx (ctx): A repository_ctx.
     Returns:
-        The BUILD file contents for this compiler and compiler library
+        string: The BUILD file contents for the rust source code
     """
     tool_suburl = produce_tool_suburl("rustc", "src", ctx.attr.version, ctx.attr.iso_date)
     static_rust = ctx.os.environ["STATIC_RUST_URL"] if "STATIC_RUST_URL" in ctx.os.environ else "https://static.rust-lang.org"

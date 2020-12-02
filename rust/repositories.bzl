@@ -2,7 +2,6 @@
 load(":known_shas.bzl", "FILE_KEY_TO_SHA")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
-load("//worker:repositories.bzl", "rust_worker_repositories", "rust_worker_toolchains")
 load(
     "//rust/platform:triple_mappings.bzl",
     "system_to_binary_ext",
@@ -49,7 +48,7 @@ def rust_repositories(
         edition: The rust edition to be used by default (2015 (default) or 2018)
         dev_components: Whether to download the rustc-dev components (defaults to False). Requires version to be "nightly".
         sha256s: A dict associating tool subdirectories to sha256 hashes.
-        use_worker: boolean. Set to True to use Bazel workers for Rust. This downloads binaries for https://github.com/nikhilm/rustc-worker.
+        use_worker: boolean. Set to True to use Bazel workers for Rust.
     """
 
     if dev_components and version != "nightly":
@@ -145,16 +144,14 @@ def rust_repositories(
         edition = edition,
     )
 
-    rust_worker_repositories()
-
-    # Register the real toolchains.
     if use_worker:
-        rust_worker_toolchains()
-
-    # Register a fallback for when workers are not enabled or not available for the execution platform.
-    native.register_toolchains(
-        "@io_bazel_rules_rust//worker:dummy",
-    )
+        native.register_toolchains(
+            "@io_bazel_rules_rust//worker",
+        )
+    else:
+        native.register_toolchains(
+            "@io_bazel_rules_rust//worker:dummy",
+        )
 
 def _check_version_valid(version, iso_date, param_prefix = ""):
     """Verifies that the provided rust version and iso_date make sense."""

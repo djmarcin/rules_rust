@@ -1,4 +1,5 @@
 use protobuf::ProtobufResult;
+mod lib;
 
 fn main() -> ProtobufResult<()> {
     let mut args = std::env::args_os().peekable();
@@ -13,7 +14,7 @@ fn main() -> ProtobufResult<()> {
         .into_string()
         .expect("compilation mode must be valid utf-8");
     // TODO: program and rustc_path will combine when this is merged into rules_rust.
-    let worker = rustc_worker::Worker::new(program, rustc_path, compilation_mode)?;
+    let worker = lib::Worker::new(program, rustc_path, compilation_mode)?;
 
     // If started as a persistent worker.
     if let Some(arg) = args.peek() {

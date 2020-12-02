@@ -13,6 +13,7 @@ def _rust_binary_impl(ctx):
     toolchain = ctx.toolchains["@io_bazel_rules_rust//rust:toolchain"]
     output = ctx.actions.declare_file(ctx.label.name + toolchain.binary_ext)
     cache_dir = ctx.actions.declare_directory(ctx.label.name + "_cache")
+    target_dir = ctx.actions.declare_directory(ctx.label.name + "_target")
     folder = ctx.files.srcs[0].dirname
     rust_bin = toolchain.cargo.dirname
 
@@ -38,23 +39,25 @@ def _rust_binary_impl(ctx):
 
     ctx.actions.run_shell(
         inputs = ctx.files.srcs,
-        outputs = [output, cache_dir],
+        outputs = [output, cache_dir, target_dir],
         command = """\
 export RUSTC="$(pwd)/{rustc}"; \
 export CARGO="$(pwd)/{cargo}"; \
 export OUTPUT="$(pwd)/{output}"; \
 export CARGO_HOME="$(pwd)/{cache_dir}"; \
+export CARGO_TARGET_DIR="$(pwd)/{target_dir}"; \
 export PATH="{msvc_path}$PATH"; \
 export LIB="{lib}"; \
 cd {folder} && \
 "$CARGO" build -q --release && \
-mv target/release/rustc-worker "$OUTPUT" """.format(
+mv $CARGO_TARGET_DIR/release/rustc-worker "$OUTPUT" """.format(
             rust_bin = rust_bin,
             folder = folder,
             cargo = toolchain.cargo.path,
             rustc = toolchain.rustc.path,
             output = output.path,
             cache_dir = cache_dir.path,
+            target_dir = target_dir.path,
             msvc_path = msvc_path,
             lib = lib,
         ),

@@ -102,7 +102,7 @@ def create_crate(ctx, info, crate_mapping):
     """Creates a crate in the rust-project.json format
 
     Args:
-        ctx (ctx): The rule context from which the exec_root can be retrieved
+        ctx (ctx): The rule context
         info (RustAnalyzerInfo): The crate RustAnalyzerInfo for the current crate
         crate_mapping (dict): A dict of {String:Int} that memoizes crates for deps.
 
@@ -118,20 +118,18 @@ def create_crate(ctx, info, crate_mapping):
     # TODO: Some folks may want to override this for vendored dependencies.
     if info.crate.root.path.startswith("external/"):
         crate["is_workspace_member"] = False
-        crate["root_module"] = ctx.attr.exec_root + "/" + info.crate.root.path
-        crate_root = ctx.attr.exec_root + "/" + info.crate.root.dirname + "/../"
+        crate["root_module"] = "__EXEC_ROOT__/" + info.crate.root.path
+        crate_root = "__EXEC_ROOT__/" + info.crate.root.dirname + "/../"
     else:
-        # Compute the number of ../ we need for relative paths.
-        rule_depth = ctx.build_file_path.count("/") + 1
         crate["is_workspace_member"] = True
-        crate["root_module"] = "../" * rule_depth + info.crate.root.path
-        crate_root = "../" * rule_depth + info.crate.root.dirname + "/../"
+        crate["root_module"] = info.crate.root.path
+        crate_root = info.crate.root.dirname + "/../"
 
     if info.build_info != None:
-        crate["env"].update({"OUT_DIR": ctx.attr.exec_root + "/" + info.build_info.out_dir.path})
+        crate["env"].update({"OUT_DIR": "__EXEC_ROOT__/" + info.build_info.out_dir.path})
         crate["source"] = {
             # We have to tell rust-analyzer about our out_dir since it's not under the crate root.
-            "include_dirs": [crate_root, ctx.attr.exec_root + "/" + info.build_info.out_dir.path],
+            "include_dirs": [crate_root, "__EXEC_ROOT__/" + info.build_info.out_dir.path],
             "exclude_dirs": [],
         }
     crate["env"].update(info.env)
@@ -147,7 +145,7 @@ def create_crate(ctx, info, crate_mapping):
     crate["cfg"] = info.cfgs
     crate["target"] = find_toolchain(ctx).target_triple
     if info.proc_macro_dylib_path != None:
-        crate["proc_macro_dylib_path"] = ctx.attr.exec_root + "/" + info.proc_macro_dylib_path
+        crate["proc_macro_dylib_path"] = "__EXEC_ROOT__/" + info.proc_macro_dylib_path
     return "ID-" + info.crate.root.path, crate
 
 # This implementation is incomplete because in order to get rustc env vars we
@@ -160,7 +158,7 @@ def _rust_project_impl(ctx):
     crate_mapping = dict()
 
     output = dict()
-    output["sysroot_src"] = ctx.attr.exec_root + "/" + rust_toolchain.rust_lib.label.workspace_root + "/lib/rustlib/src/library"
+    output["sysroot_src"] = "__EXEC_ROOT__/" + rust_toolchain.rust_lib.label.workspace_root + "/lib/rustlib/src/library"
     output["crates"] = []
 
     # Gather all crates and their dependencies into an array.
@@ -193,10 +191,6 @@ rust_analyzer = rule(
         "targets": attr.label_list(
             aspects = [rust_analyzer_aspect],
             doc = "List of all targets to be included in the index",
-        ),
-        "exec_root": attr.string(
-            mandatory = True,
-            doc = "Execution root of Bazel as returned by 'bazel info execution_root'.",
         ),
     },
     outputs = {

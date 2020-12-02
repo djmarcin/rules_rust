@@ -89,6 +89,5 @@ rust_doc_test(
 
 rust_analyzer(
     name = "hello_rust_analyzer",
-    exec_root = "bazel-rules_rust",
     targets = [":hello_lib"],
 )

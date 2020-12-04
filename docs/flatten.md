@@ -24,6 +24,7 @@
 * [rust_toolchain_repository_proxy](#rust_toolchain_repository_proxy)
 * [rust_wasm_bindgen](#rust_wasm_bindgen)
 * [rust_wasm_bindgen_toolchain](#rust_wasm_bindgen_toolchain)
+* [rust_workspace](#rust_workspace)
 
 
 <a id="#rust_analyzer"></a>
@@ -31,7 +32,7 @@
 ## rust_analyzer
 
 <pre>
-rust_analyzer(<a href="#rust_analyzer-name">name</a>, <a href="#rust_analyzer-exec_root">exec_root</a>, <a href="#rust_analyzer-targets">targets</a>)
+rust_analyzer(<a href="#rust_analyzer-name">name</a>, <a href="#rust_analyzer-targets">targets</a>)
 </pre>
 
 Produces a rust-project.json for the given targets. Configure rust-analyzer to load the generated file via the linked projects mechanism.
@@ -42,7 +43,6 @@ Produces a rust-project.json for the given targets. Configure rust-analyzer to l
 | Name  | Description | Type | Mandatory | Default |
 | :------------- | :------------- | :------------- | :------------- | :------------- |
 | <a id="rust_analyzer-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/docs/build-ref.html#name">Name</a> | required |  |
-| <a id="rust_analyzer-exec_root"></a>exec_root |  Execution root of Bazel as returned by 'bazel info execution_root'.   | String | required |  |
 | <a id="rust_analyzer-targets"></a>targets |  List of all targets to be included in the index   | <a href="https://bazel.build/docs/build-ref.html#labels">List of labels</a> | optional | [] |
 
 

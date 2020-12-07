@@ -14,7 +14,7 @@ load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependen
 def deps():
     """Define dependencies for `rules_rust` examples"""
 
-    rust_repositories()
+    rust_repositories(use_worker = True)
 
     rust_bindgen_repositories()
 

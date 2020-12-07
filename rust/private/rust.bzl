@@ -498,6 +498,7 @@ rust_library = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust library crate.
@@ -588,6 +589,7 @@ rust_binary = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust binary crate.
@@ -686,6 +688,7 @@ rust_test = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust test crate.
@@ -834,6 +837,7 @@ rust_test_binary = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust test binary, without marking this rule as a Bazel test.
@@ -857,6 +861,7 @@ rust_benchmark = rule(
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",
         "@bazel_tools//tools/cpp:toolchain_type",
+        "@io_bazel_rules_rust//worker:toolchain_type",
     ],
     doc = """\
 Builds a Rust benchmark test.

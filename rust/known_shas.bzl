@@ -824,6 +824,7 @@ FILE_KEY_TO_SHA = {
     "rustc-1.47.0-x86_64-unknown-freebsd": "811f298c07fb32a6a01f9960f2d7dc403f6f288a3f475ed9806648e2cc5938ca",
     "rustc-1.47.0-x86_64-unknown-linux-gnu": "d96be0ae1deada01f41372ab2c2f485a9f8625069aeaff33c5b513061e9706d4",
     "rustc-1.48.0-aarch64-unknown-linux-gnu": "9c83a5d18f6ca913eeffd78c53913da288b171ff245137b646a8fd280fe72340",
+    "rustc-1.48.0-src": "0e763e6db47d5d6f91583284d2f989eacc49b84794d1443355b85c58d67ae43b",
     "rustc-1.48.0-x86_64-apple-darwin": "846f45f9bd6676e9d1f6758279b48e32564ba23773e69aa89692dbc123dbea5a",
     "rustc-1.48.0-x86_64-pc-windows-msvc": "395b2a8e6824b3e56a8a9b4598273be5410b4ea64e92c8aeaf900d9ff21f470f",
     "rustc-1.48.0-x86_64-unknown-freebsd": "fbaff313c2423f1ababc9792332560ca0e3749abf3749e7eb5289bc6515d9424",

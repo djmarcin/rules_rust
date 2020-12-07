@@ -452,7 +452,7 @@ def load_arbitrary_tool(ctx, tool_name, tool_subdirectories, version, iso_date, 
     # N.B. See https://static.rust-lang.org/dist/index.html to find the tool_suburl for a given
     # tool.
     tool_suburl = produce_tool_suburl(tool_name, target_triple, version, iso_date)
-    static_rust = ctx.os.environ["STATIC_RUST_URL"] if "STATIC_RUST_URL" in ctx.os.environ else "https://static.rust-lang.org"
+    static_rust = ctx.os.environ.get("STATIC_RUST_URL", "https://static.rust-lang.org")
     url = "{}/dist/{}.tar.gz".format(static_rust, tool_suburl)
 
     tool_path = produce_tool_path(tool_name, target_triple, version)
@@ -520,7 +520,7 @@ def _load_rust_src(ctx):
         string: The BUILD file contents for the rust source code
     """
     tool_suburl = produce_tool_suburl("rustc", "src", ctx.attr.version, ctx.attr.iso_date)
-    static_rust = ctx.os.environ["STATIC_RUST_URL"] if "STATIC_RUST_URL" in ctx.os.environ else "https://static.rust-lang.org"
+    static_rust = ctx.os.environ.get("STATIC_RUST_URL", "https://static.rust-lang.org")
     url = "{}/dist/{}.tar.gz".format(static_rust, tool_suburl)
 
     tool_path = produce_tool_path("rustc", "src", ctx.attr.version)

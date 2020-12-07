@@ -49,25 +49,16 @@ def _rust_analyzer_aspect_impl(target, ctx):
 
     toolchain = find_toolchain(ctx)
 
-    cfgs = []
-    for feature in ctx.rule.attr.crate_features:
-        cfgs.append("feature=\"" + feature + "\"")
-    for flag in ctx.rule.attr.rustc_flags:
-        # --cfg flags should be passed as well but as an atomic
-        # config, not key/value
-        if flag.startswith("--cfg ") or flag.startswith("--cfg="):
-            cfgs.append(flag[6:])
+    cfgs = ['feature="{}"'.format(f) for f in ctx.rule.attr.crate_features]
 
-    env = {}
+    # --cfg flags should be passed as well but as an atomic config, not key/value
+    cfgs += [f[6:] for f in ctx.rule.attr.rustc_flags if f.startswith("--cfg ") or f.startswith("--cfg=")]
 
-    # If one of our deps is a cargo_build_script, set OUT_DIR.
+    # Save BuildInfo if we find any (for build script output)
     build_info = None
     for dep in ctx.rule.attr.deps:
         if BuildInfo in dep:
             build_info = dep[BuildInfo]
-
-    # Add rest of rustc_env
-    env.update(ctx.rule.attr.rustc_env)
 
     deps = [dep[RustAnalyzerInfo] for dep in (ctx.rule.attr.deps + ctx.rule.attr.proc_macro_deps) if RustAnalyzerInfo in dep]
     transitive_deps = depset(direct = deps, order = "postorder", transitive = [dep.transitive_deps for dep in deps])
@@ -78,13 +69,13 @@ def _rust_analyzer_aspect_impl(target, ctx):
         dylib_ext = system_to_dylib_ext(triple_to_system(toolchain.target_triple))
         for action in target.actions:
             for output in action.outputs.to_list():
-                if "." + output.extension == dylib_ext:
+                if output.extension == dylib_ext[1:]:
                     proc_macro_dylib_path = output.path
 
     return [RustAnalyzerInfo(
         crate = crate_info,
         cfgs = cfgs,
-        env = env,
+        env = ctx.rule.attr.rustc_env,
         deps = deps,
         transitive_deps = transitive_deps,
         proc_macro_dylib_path = proc_macro_dylib_path,
@@ -95,8 +86,18 @@ rust_analyzer_aspect = aspect(
     attr_aspects = ["deps", "proc_macro_deps"],
     implementation = _rust_analyzer_aspect_impl,
     toolchains = ["@io_bazel_rules_rust//rust:toolchain"],
-    doc = "Annotates rust rules with RustAnalyzerInfo later used to build a rust-project.json"
+    doc = "Annotates rust rules with RustAnalyzerInfo later used to build a rust-project.json",
 )
+
+_exec_root_tmpl = '__EXEC_ROOT__/'
+
+def _crate_id(crate_info):
+    '''Returns a unique stable identifier for a crate
+    
+    Returns:
+        (string): This crate's unique stable id.
+    '''
+    return "ID-" + crate_info.root.path
 
 def create_crate(ctx, info, crate_mapping):
     """Creates a crate in the rust-project.json format
@@ -107,10 +108,10 @@ def create_crate(ctx, info, crate_mapping):
         crate_mapping (dict): A dict of {String:Int} that memoizes crates for deps.
 
     Returns:
-        Tuple containing this crate's ID and the crate rust-project representation
+        (dict) The crate rust-project.json representation
     """
     crate = dict()
-    crate["name"] = info.crate.name
+    crate["display_name"] = info.crate.name
     crate["edition"] = info.crate.edition
     crate["env"] = {}
 
@@ -118,35 +119,32 @@ def create_crate(ctx, info, crate_mapping):
     # TODO: Some folks may want to override this for vendored dependencies.
     if info.crate.root.path.startswith("external/"):
         crate["is_workspace_member"] = False
-        crate["root_module"] = "__EXEC_ROOT__/" + info.crate.root.path
-        crate_root = "__EXEC_ROOT__/" + info.crate.root.dirname + "/../"
+        crate["root_module"] = _exec_root_tmpl + info.crate.root.path
+        crate_root = _exec_root_tmpl + info.crate.root.dirname + "/../"
     else:
         crate["is_workspace_member"] = True
         crate["root_module"] = info.crate.root.path
         crate_root = info.crate.root.dirname + "/../"
 
     if info.build_info != None:
-        crate["env"].update({"OUT_DIR": "__EXEC_ROOT__/" + info.build_info.out_dir.path})
+        crate["env"].update({"OUT_DIR": _exec_root_tmpl + info.build_info.out_dir.path})
         crate["source"] = {
             # We have to tell rust-analyzer about our out_dir since it's not under the crate root.
-            "include_dirs": [crate_root, "__EXEC_ROOT__/" + info.build_info.out_dir.path],
+            "include_dirs": [crate_root, _exec_root_tmpl + info.build_info.out_dir.path],
             "exclude_dirs": [],
         }
     crate["env"].update(info.env)
 
-    deps = []
-    for dep in info.deps:
-        deps.append({
-            "name": dep.crate.name,
-            "crate": crate_mapping["ID-" + dep.crate.root.path],
-        })
-
+    deps = [
+        {"name": d.crate.name, "crate": crate_mapping[_crate_id(info.crate)]}
+        for d in info.deps
+    ]
     crate["deps"] = deps
     crate["cfg"] = info.cfgs
     crate["target"] = find_toolchain(ctx).target_triple
     if info.proc_macro_dylib_path != None:
-        crate["proc_macro_dylib_path"] = "__EXEC_ROOT__/" + info.proc_macro_dylib_path
-    return "ID-" + info.crate.root.path, crate
+        crate["proc_macro_dylib_path"] = _exec_root_tmpl + info.proc_macro_dylib_path
+    return crate
 
 # This implementation is incomplete because in order to get rustc env vars we
 # would need to actually execute the build graph and gather the output of
@@ -155,14 +153,12 @@ def create_crate(ctx, info, crate_mapping):
 # TODO(djmarcin): Run the cargo_build_scripts to gather env vars correctly.
 def _rust_project_impl(ctx):
     rust_toolchain = find_toolchain(ctx)
-    crate_mapping = dict()
-
-    output = dict()
-    output["sysroot_src"] = "__EXEC_ROOT__/" + rust_toolchain.rust_lib.label.workspace_root + "/lib/rustlib/src/library"
-    output["crates"] = []
+    sysroot_src = _exec_root_tmpl + rust_toolchain.rust_lib.label.workspace_root + "/lib/rustlib/src/library"
 
     # Gather all crates and their dependencies into an array.
     # Dependencies are referenced by index, so leaves should come first.
+    crates = []
+    crate_mapping = dict()
     idx = 0
     for target in ctx.attr.targets:
         if RustAnalyzerInfo not in target:
@@ -170,21 +166,24 @@ def _rust_project_impl(ctx):
 
         # Add this crate's transitive deps to the crate mapping and output.
         for dep_info in target[RustAnalyzerInfo].transitive_deps.to_list():
-            crate_id, crate = create_crate(ctx, dep_info, crate_mapping)
+            crate_id = _crate_id(dep_info.crate)
             if crate_id not in crate_mapping:
                 crate_mapping[crate_id] = idx
                 idx += 1
-                output["crates"].append(crate)
+                crates.append(create_crate(ctx, dep_info, crate_mapping))
 
         # Add this crate to the crate mapping and output.
-        crate_id, crate = create_crate(ctx, target[RustAnalyzerInfo], crate_mapping)
+        crate_id = _crate_id(target[RustAnalyzerInfo].crate)
         if crate_id not in crate_mapping:
             crate_mapping[crate_id] = idx
             idx += 1
-            output["crates"].append(crate)
+            crates.append(create_crate(ctx, target[RustAnalyzerInfo], crate_mapping))
 
     # TODO(djmarcin): Use json module once bazel 4.0 is released.
-    ctx.actions.write(output = ctx.outputs.filename, content = struct(**output).to_json())
+    ctx.actions.write(output = ctx.outputs.filename, content = struct(
+        sysroot_src = sysroot_src,
+        crates = crates,
+    ).to_json())
 
 rust_analyzer = rule(
     attrs = {
@@ -198,5 +197,5 @@ rust_analyzer = rule(
     },
     implementation = _rust_project_impl,
     toolchains = ["@io_bazel_rules_rust//rust:toolchain"],
-    doc = "Produces a rust-project.json for the given targets. Configure rust-analyzer to load the generated file via the linked projects mechanism."
+    doc = "Produces a rust-project.json for the given targets. Configure rust-analyzer to load the generated file via the linked projects mechanism.",
 )

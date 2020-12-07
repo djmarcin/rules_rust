@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -47,7 +48,11 @@ fn main() {
         .expect("failed to read generated rust-project.json");
 
     // It's OK if the file doesn't exist.
-    let _ = fs::remove_file(&workspace_rust_project);
+    match fs::remove_file(&workspace_rust_project) {
+        Ok(_) => {}
+        Err(err) if err.kind() == ErrorKind::NotFound => {},
+        Err(_) => panic!("Unexpected error removing old rust-project.json"),
+    }
     fs::write(
         workspace_rust_project,
         generated_json.replace("__EXEC_ROOT__", &canonical_exec_root.to_string_lossy()),

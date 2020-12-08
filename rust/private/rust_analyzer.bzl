@@ -136,7 +136,7 @@ def create_crate(ctx, info, crate_mapping):
     crate["env"].update(info.env)
 
     deps = [
-        {"name": d.crate.name, "crate": crate_mapping[_crate_id(info.crate)]}
+        {"name": d.crate.name, "crate": crate_mapping[_crate_id(d.crate)]}
         for d in info.deps
     ]
     crate["deps"] = deps

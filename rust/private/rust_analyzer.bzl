@@ -49,9 +49,9 @@ def _rust_analyzer_aspect_impl(target, ctx):
 
     toolchain = find_toolchain(ctx)
 
-    cfgs = ['feature="{}"'.format(f) for f in ctx.rule.attr.crate_features]
-
-    # --cfg flags should be passed as well but as an atomic config, not key/value
+    # Always add test & debug_assertions (like here: https://github.com/rust-analyzer/rust-analyzer/blob/505ff4070a3de962dbde66f08b6550cda2eb4eab/crates/project_model/src/lib.rs#L379-L381)
+    cfgs = ["test", "debug_assertions"]
+    cfgs += ['feature="{}"'.format(f) for f in ctx.rule.attr.crate_features]
     cfgs += [f[6:] for f in ctx.rule.attr.rustc_flags if f.startswith("--cfg ") or f.startswith("--cfg=")]
 
     # Save BuildInfo if we find any (for build script output)

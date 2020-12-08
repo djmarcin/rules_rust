@@ -51,8 +51,10 @@ def _rust_analyzer_aspect_impl(target, ctx):
 
     # Always add test & debug_assertions (like here: https://github.com/rust-analyzer/rust-analyzer/blob/505ff4070a3de962dbde66f08b6550cda2eb4eab/crates/project_model/src/lib.rs#L379-L381)
     cfgs = ["test", "debug_assertions"]
-    cfgs += ['feature="{}"'.format(f) for f in ctx.rule.attr.crate_features]
-    cfgs += [f[6:] for f in ctx.rule.attr.rustc_flags if f.startswith("--cfg ") or f.startswith("--cfg=")]
+    if hasattr(ctx.rule.attr, "crate_features"):
+        cfgs += ['feature="{}"'.format(f) for f in ctx.rule.attr.crate_features]
+    if hasattr(ctx.rule.attr, "rustc_flags"):
+        cfgs += [f[6:] for f in ctx.rule.attr.rustc_flags if f.startswith("--cfg ") or f.startswith("--cfg=")]
 
     # Save BuildInfo if we find any (for build script output)
     build_info = None
@@ -60,7 +62,9 @@ def _rust_analyzer_aspect_impl(target, ctx):
         if BuildInfo in dep:
             build_info = dep[BuildInfo]
 
-    deps = [dep[RustAnalyzerInfo] for dep in (ctx.rule.attr.deps + ctx.rule.attr.proc_macro_deps) if RustAnalyzerInfo in dep]
+    deps = [dep[RustAnalyzerInfo] for dep in ctx.rule.attr.deps if RustAnalyzerInfo in dep]
+    if hasattr(ctx.rule.attr, "proc_macro_deps"):
+        deps += [dep[RustAnalyzerInfo] for dep in ctx.rule.attr.proc_macro_deps if RustAnalyzerInfo in dep]
     transitive_deps = depset(direct = deps, order = "postorder", transitive = [dep.transitive_deps for dep in deps])
 
     crate_info = target[CrateInfo]
@@ -75,7 +79,7 @@ def _rust_analyzer_aspect_impl(target, ctx):
     return [RustAnalyzerInfo(
         crate = crate_info,
         cfgs = cfgs,
-        env = ctx.rule.attr.rustc_env,
+        env = ctx.rule.attr.rustc_env if hasattr(ctx.rule.attr, "rustc_env") else {},
         deps = deps,
         transitive_deps = transitive_deps,
         proc_macro_dylib_path = proc_macro_dylib_path,

@@ -21,8 +21,7 @@ def rust_repositories(
         rustfmt_version = "1.48.0",
         edition = None,
         dev_components = False,
-        sha256s = None,
-        use_worker = False):
+        sha256s = None):
     """Emits a default set of toolchains for Linux, OSX, and Freebsd
 
     Skip this macro and call the `rust_repository_set` macros directly if you need a compiler for \
@@ -48,7 +47,6 @@ def rust_repositories(
         edition: The rust edition to be used by default (2015 (default) or 2018)
         dev_components: Whether to download the rustc-dev components (defaults to False). Requires version to be "nightly".
         sha256s: A dict associating tool subdirectories to sha256 hashes.
-        use_worker: boolean. Set to True to use Bazel workers for Rust.
     """
 
     if dev_components and version != "nightly":
@@ -144,14 +142,9 @@ def rust_repositories(
         edition = edition,
     )
 
-    if use_worker:
-        native.register_toolchains(
-            "@io_bazel_rules_rust//worker",
-        )
-    else:
-        native.register_toolchains(
-            "@io_bazel_rules_rust//worker:dummy",
-        )
+    native.register_toolchains(
+        "@io_bazel_rules_rust//worker",
+    )
 
 def _check_version_valid(version, iso_date, param_prefix = ""):
     """Verifies that the provided rust version and iso_date make sense."""

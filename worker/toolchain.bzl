@@ -1,6 +1,9 @@
+"""
+Define a worker toolchain.
+"""
+
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
-# buildifier: disable=module-docstring
 def _worker_toolchain_impl(ctx):
     if ctx.attr.enabled[BuildSettingInfo].value:
         binary = ctx.executable.worker_binary

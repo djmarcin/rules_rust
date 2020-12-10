@@ -382,7 +382,7 @@ def construct_arguments(
         maker_path = None,
         aspect = False,
         emit = ["dep-info", "link"],
-        use_worker=False):
+        use_worker = False):
     """Builds an Args object containing common rustc flags
 
     Args:

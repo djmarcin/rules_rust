@@ -6,8 +6,37 @@ the worker binary.
 load("@io_bazel_rules_rust//rust:private/rustc.bzl", "get_cc_toolchain", "get_linker_and_args")
 
 def _rewrite_to_unix_path(path):
+    if not path:
+        return ""
     drive = path[0]
     return "/" + drive + path[2:].replace("\\", "/")
+
+def _rewrite_to_unix_paths(paths):
+    """Turn a semicolon-delimited set of Windows paths into their Unix equivalents."""
+    return ":".join([_rewrite_to_unix_path(path) for path in paths.split(";")])
+
+def _get_windows_env_vars(ctx):
+    """Get required PATH and LIB env vars on Windows.
+
+    Returns (path, lib).
+
+    We must prepend PATH to the standard run_shell() path so that MSVC's link.exe is found
+    instead of MSYS's.
+
+    LIB must be defined for linking to succeed on Windows."""
+
+    cc_toolchain, feature_configuration = get_cc_toolchain(ctx)
+    _, _, env = get_linker_and_args(ctx, cc_toolchain, feature_configuration, depset())
+
+    lib = env.get("LIB", "")
+    if not lib:
+        # not MSVC
+        return "", ""
+
+    lib = _rewrite_to_unix_path(lib)
+    path = _rewrite_to_unix_paths(env["PATH"])
+
+    return path, lib
 
 def _rust_binary_impl(ctx):
     toolchain = ctx.toolchains["@io_bazel_rules_rust//rust:toolchain"]
@@ -16,26 +45,7 @@ def _rust_binary_impl(ctx):
     target_dir = ctx.actions.declare_directory(ctx.label.name + "_target")
     folder = ctx.files.srcs[0].dirname
     rust_bin = toolchain.cargo.dirname
-
-    # get linker env for building on Windows
-    cc_toolchain, feature_configuration = get_cc_toolchain(ctx)
-    _, _, link_env = get_linker_and_args(ctx, cc_toolchain, feature_configuration, depset())
-
-    # this is an awful hack to extract the path to MSVC on Windows, so we can inject it
-    # into the path after use_default_shell_env has set it up. Without default_shell_env,
-    # compilation fails on other platforms because `cc` is not in the path. There is no doubt
-    # a better way to handle this.
-    path = link_env.get("PATH")
-    if path:
-        # cc toolchain has placed it at head of path
-        msvc_path = path.split(";")[0]
-        msvc_path = _rewrite_to_unix_path(msvc_path) + ":"
-    else:
-        msvc_path = ""
-
-    lib = link_env.get("LIB", "")
-    if lib:
-        lib = _rewrite_to_unix_path(lib)
+    msvc_path, msvc_lib = _get_windows_env_vars(ctx)
 
     ctx.actions.run_shell(
         inputs = ctx.files.srcs,
@@ -46,8 +56,8 @@ export CARGO="$(pwd)/{cargo}"; \
 export OUTPUT="$(pwd)/{output}"; \
 export CARGO_HOME="$(pwd)/{cache_dir}"; \
 export CARGO_TARGET_DIR="$(pwd)/{target_dir}"; \
-export PATH="{msvc_path}$PATH"; \
-export LIB="{lib}"; \
+export PATH="{msvc_path}:$PATH"; \
+export LIB="{msvc_lib}"; \
 cd {folder} && \
 "$CARGO" build -q --release && \
 mv $CARGO_TARGET_DIR/release/rustc-worker "$OUTPUT" """.format(
@@ -59,7 +69,7 @@ mv $CARGO_TARGET_DIR/release/rustc-worker "$OUTPUT" """.format(
             cache_dir = cache_dir.path,
             target_dir = target_dir.path,
             msvc_path = msvc_path,
-            lib = lib,
+            msvc_lib = msvc_lib,
         ),
         tools = [toolchain.cargo, toolchain.rustc] + toolchain.rust_lib.files.to_list() + toolchain.rustc_lib.files.to_list(),
         use_default_shell_env = True,

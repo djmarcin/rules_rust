@@ -1,6 +1,14 @@
 """
 A simplified rust_binary implementation based on cargo so we can compile
 the worker binary.
+
+If using this on Windows, it's a good idea to place the following in your .bazelrc:
+
+build:windows --worker_quit_after_build
+
+This will ensure workers quit at the end of a build. If they're allowed to continue
+running until Bazel shuts down, configuration changes that prompt the worker to be
+recompiled will fail, as we can't write to a running .exe file on Windows.
 """
 
 load("@io_bazel_rules_rust//rust:private/rustc.bzl", "get_cc_toolchain", "get_linker_and_args")

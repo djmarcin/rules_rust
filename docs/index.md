@@ -65,15 +65,30 @@ Similarly, `rustfmt_version` may also be configured:
 ```python
 rust_repositories(rustfmt_version = "1.48.0")
 ```
+
 # Using Bazel Persistent Workers
 
-Iterating on Rust code may benefit from [incremental compilation](https://doc.rust-lang.org/edition-guide/rust-2018/the-compiler/incremental-compilation-for-faster-compiles.html). This is supported by using a [Bazel Persistent Worker](https://docs.bazel.build/versions/master/persistent-workers.html). While Bazel can determine what needs to be rebuilt at a crate level, the compiler can speed up building a single crate by sharing information across runs. It does this by storing intermediate information in a directory across invocations. This is enabled by default in Cargo. Persistent workers bring this feature to Bazel.
+When building with Cargo, the Rust compiler stores incremental build products, and reuses them where possible to speed up subsequent builds. The Rust rules do not do this by default, which can mean small changes take longer to compile in Bazel than they do with Cargo.
 
-The Rust rules have preliminary support for workers. Pass `use_worker = True` to enable this when available.
+These rules come with experimental support for [incremental compilation](https://doc.rust-lang.org/edition-guide/rust-2018/the-compiler/incremental-compilation-for-faster-compiles.html). This is possible in Bazel by using a [Bazel Persistent Worker](https://docs.bazel.build/versions/master/persistent-workers.html) to invoke the Rust compiler, and direct its intermediate build files to a rustc-worker folder in your TEMP folder.
 
-```python
-rust_repositories(use_worker = True)
+You can enable the worker by passing
+`--@io_bazel_rules_rust//worker:use_worker=True` on the command line, or by
+placing the following into your .bazelrc file:
+
 ```
+build --@io_bazel_rules_rust//worker:use_worker=True
+build:windows --worker_quit_after_build
+```
+
+The second line is only required on Windows, and works around a file-locking issue.
+
+The incremental worker has received little testing so far, and there has been a
+report of compilation failures after changing dependencies, which required a
+manual purge of the /tmp/rustc-worker\* folders - so you may wish to avoid using
+this in production for now. But it can mean a 2-3x speedup on short
+edit/compile/repeat cycles, so you may feel the risks are worth it during
+development.
 
 ## External Dependencies
 

@@ -11,6 +11,8 @@ build --@io_bazel_rules_rust//worker:use_worker=True
 build:windows --worker_quit_after_build
 ```
 
+This code is still experimental, and has not had a lot of testing.
+
 ## Why is this built by invoking Cargo directly?
 
 Because the rust_binary() and similar rules depend on a worker toolchain (even a dummy one), we can't

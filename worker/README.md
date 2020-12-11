@@ -11,7 +11,8 @@ build --@io_bazel_rules_rust//worker:use_worker=True
 build:windows --worker_quit_after_build
 ```
 
-This code is still experimental, and has not had a lot of testing.
+This code is still experimental, and has not had a lot of testing. It may
+change or go away at any time.
 
 ## Why is this built by invoking Cargo directly?
 

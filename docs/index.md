@@ -90,6 +90,8 @@ this in production for now. But it can mean a 2-3x speedup on short
 edit/compile/repeat cycles, so you may feel the risks are worth it during
 development.
 
+Because this feature is currently experimental, it may change or go away at any time.
+
 ## External Dependencies
 
 Currently the most common approach to managing external dependencies is using

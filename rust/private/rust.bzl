@@ -230,7 +230,7 @@ def _rust_test_common(ctx, toolchain, output):
 
     crate_name = ctx.label.name.replace("-", "_")
 
-    if ctx.attr.crate:
+    if hasattr(ctx.attr, "crate"):
         # Target is building the crate in `test` config
         # Build the test binary using the dependency's srcs.
         crate = ctx.attr.crate[CrateInfo]
@@ -302,9 +302,7 @@ def _rust_benchmark_impl(ctx):
 
     # Build the underlying benchmark binary.
     bench_binary = ctx.actions.declare_file(
-        "{}_bin{}".format(ctx.label.name, toolchain.binary_ext),
-        sibling = ctx.configuration.bin_dir,
-    )
+        "{}{}".format(ctx.label.name, toolchain.binary_ext))
     info = _rust_test_common(ctx, toolchain, bench_binary)
 
     if toolchain.exec_triple.find("windows") != -1:
@@ -337,7 +335,7 @@ def _rust_benchmark_impl(ctx):
     return [
         DefaultInfo(
             runfiles = ctx.runfiles(
-                files = info.runfiles + [bench_binary],
+                files = ctx.attr.data + [bench_binary],
                 collect_data = True,
             ),
             executable = bench_script,

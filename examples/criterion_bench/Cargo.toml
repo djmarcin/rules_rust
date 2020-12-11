@@ -1,0 +1,11 @@
+[package]
+name = "rules_rust_examples_criterion_bench"
+version = "0.0.1"
+edition = "2018"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "fibonacci"
+harness = false

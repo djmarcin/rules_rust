@@ -301,26 +301,9 @@ def _rust_benchmark_impl(ctx):
     toolchain = find_toolchain(ctx)
 
     # Build the underlying benchmark binary.
-    crate_name = ctx.label.name.replace("-", "_")
-    bench_binary = ctx.actions.declare_file(ctx.label.name + toolchain.binary_ext)
-    info = rustc_compile_action(
-        ctx = ctx,
-        toolchain = toolchain,
-        crate_info = CrateInfo(
-            name = crate_name,
-            type = "bin",
-            root = crate_root_src(ctx.attr, ctx.files.srcs, "bin"),
-            srcs = ctx.files.srcs,
-            deps = ctx.attr.deps,
-            proc_macro_deps = ctx.attr.proc_macro_deps,
-            aliases = ctx.attr.aliases,
-            output = bench_binary,
-            edition = get_edition(ctx.attr, toolchain),
-            rustc_env = ctx.attr.rustc_env,
-            is_test = False,
-        ),
-        rust_flags = ["--test"] if ctx.attr.test_harness else [],
-    )
+    bench_binary = ctx.actions.declare_file(
+        "{}{}".format(ctx.label.name, toolchain.binary_ext))
+    info = _rust_test_common(ctx, toolchain, bench_binary)
 
     if toolchain.exec_triple.find("windows") != -1:
         bench_script = ctx.actions.declare_file(
@@ -351,9 +334,9 @@ def _rust_benchmark_impl(ctx):
 
     return [
         DefaultInfo(
-            files = depset([bench_script, bench_binary]),
             runfiles = ctx.runfiles(
-                files = [bench_binary] + ctx.attr.data,
+                files = ctx.attr.data + [bench_binary],
+                collect_data = True,
             ),
             executable = bench_script,
         ),
@@ -510,19 +493,6 @@ _rust_test_attrs = {
 
             These tests are typically those that would be held out under
             `#[cfg(test)]` declarations.
-        """),
-    ),
-}
-
-_rust_benchmark_attrs = {
-    "test_harness": attr.label(
-        default = False,
-        mandatory = False,
-        doc = _tidy("""
-            Generate the test harness for this benchmark.
-
-            Criterion benchmarks do not use a test harness, but the nightly
-            #[bench] api does. Pass True if you have a #[bench] api test.
         """),
     ),
 }
@@ -892,7 +862,7 @@ See `rust_test` for example usage.
 
 rust_benchmark = rule(
     implementation = _rust_benchmark_impl,
-    attrs = dict(_rust_common_attrs.items() + _rust_benchmark_attrs.items()),
+    attrs = _rust_common_attrs,
     executable = True,
     fragments = ["cpp"],
     host_fragments = ["cpp"],
@@ -904,9 +874,11 @@ rust_benchmark = rule(
     doc = """\
 Builds a Rust benchmark test.
 
-This rule supports either criterion benchmarks (recommended) or #[bench] attribute tests.
+**Warning**: This rule is currently experimental. [Rust Benchmark tests][rust-bench] \
+require the `Bencher` interface in the unstable `libtest` crate, which is behind the \
+`test` unstable feature gate. As a result, using this rule would require using a nightly \
+binary release of Rust.
 
-[criterion]: https://github.com/bheisler/criterion.rs
 [rust-bench]: https://doc.rust-lang.org/book/benchmark-tests.html
 
 Example:
@@ -974,7 +946,6 @@ rust_benchmark(
   name = "fibonacci_bench",
   srcs = ["benches/fibonacci_bench.rs"],
   deps = [":fibonacci"],
-  test_harness = True,
 )
 ```
 

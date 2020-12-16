@@ -539,7 +539,7 @@ def _load_rust_src(ctx):
     ctx.download(
         url,
         output = archive_path,
-        sha256 = ctx.attr.sha256s.get(tool_suburl) or FILE_KEY_TO_SHA.get(tool_suburl),
+        sha256 = ctx.attr.sha256s.get(tool_suburl) or FILE_KEY_TO_SHA.get(tool_suburl) or "",
     )
     ctx.extract(
         archive_path,

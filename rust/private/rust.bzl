@@ -488,6 +488,7 @@ _rust_common_attrs = {
         cfg = "exec",
     ),
     "_error_format": attr.label(default = "//:error_format"),
+    "_extra_codegen": attr.label(default = "//:extra_codegen"),
 }
 
 _rust_library_attrs = {

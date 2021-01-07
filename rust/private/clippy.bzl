@@ -145,6 +145,7 @@ rust_clippy_aspect = aspect(
             cfg = "exec",
         ),
         "_error_format": attr.label(default = "//:error_format"),
+        "_extra_codegen": attr.label(default = "//:extra_codegen"),
     },
     toolchains = [
         "@io_bazel_rules_rust//rust:toolchain",

@@ -543,7 +543,10 @@ _common_attrs = {
         """),
     ),
     "rustc_flags": attr.string_list(
-        doc = "List of compiler flags passed to `rustc`.",
+        doc = _tidy("""
+            List of compiler flags passed to `rustc` for this target. For flags that should be
+            passed to all targets, see [--@rules_rust//:extra_codegen](#extra_codegen)
+        """)
     ),
     # TODO(stardoc): How do we provide additional documentation to an inherited attribute?
     # "name": attr.string(

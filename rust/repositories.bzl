@@ -154,6 +154,10 @@ def rust_repositories(
         urls = urls,
     )
 
+    native.register_toolchains(
+        "@rules_rust//worker",
+    )
+
 def _check_version_valid(version, iso_date, param_prefix = ""):
     """Verifies that the provided rust version and iso_date make sense."""
 
@@ -826,9 +830,9 @@ def rust_repository_set(
             "import this repo with `name = \"rules_rust\"` instead."
         )
 
-        if "io_bazel_rules_rust" in native.existing_rules():
+        if "rules_rust" in native.existing_rules():
             message += "\n\n" + (
-                "Note that the previous name of \"@io_bazel_rules_rust\" is deprecated.\n" +
+                "Note that the previous name of \"@rules_rust\" is deprecated.\n" +
                 "See https://github.com/bazelbuild/rules_rust/issues/499 for context."
             )
 

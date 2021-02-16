@@ -10,6 +10,19 @@ bzl_library(
         "@build_bazel_rules_nodejs//internal/providers:bzl",
     ],
     deps = [
+<<<<<<< HEAD
+        "@bazel_skylib//:workspace",
+        "@bazel_skylib//lib:unittest",
+        "@bazel_skylib//lib:versions",
+        "@io_bazel_rules_rust//:rules",
+        "@io_bazel_rules_rust//bindgen:rules",
+        "@io_bazel_rules_rust//cargo:rules",
+        "@io_bazel_rules_rust//proto:rules",
+        "@io_bazel_rules_rust//rust:rules",
+        "@io_bazel_rules_rust//wasm_bindgen:rules",
+        "@io_bazel_rules_rust//worker:rules",
+=======
+>>>>>>> main
         "@rules_proto//proto:rules",
     ],
 )

@@ -11,7 +11,11 @@ running until Bazel shuts down, configuration changes that prompt the worker to 
 recompiled will fail, as we can't write to a running .exe file on Windows.
 """
 
-load("@rules_rust//rust:private/rustc.bzl", "get_cc_toolchain", "get_linker_and_args")
+load("@rules_rust//rust/private:rustc.bzl", "get_linker_and_args")
+load(
+    "//rust/private:utils.bzl",
+    "find_cc_toolchain",
+)
 
 def _rewrite_to_unix_path(path):
     if not path:
@@ -33,7 +37,7 @@ def _get_windows_env_vars(ctx):
 
     LIB must be defined for linking to succeed on Windows."""
 
-    cc_toolchain, feature_configuration = get_cc_toolchain(ctx)
+    cc_toolchain, feature_configuration = find_cc_toolchain(ctx)
     _, _, env = get_linker_and_args(ctx, cc_toolchain, feature_configuration, depset())
 
     lib = env.get("LIB", "")

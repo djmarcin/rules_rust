@@ -18,7 +18,7 @@ error_format(
     visibility = ["//visibility:public"],
 )
 
-# Enables LTO across the build
+# This setting may be changed from the command line to apply a codegen flag across the whole build.
 extra_codegen(
     name = "extra_codegen",
     build_setting_default = [],

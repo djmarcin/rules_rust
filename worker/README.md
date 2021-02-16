@@ -7,7 +7,7 @@ The Rust Persistent Worker is itself implemented in Rust. It is built by invokin
 Place the following in your project's .bazelrc:
 
 ```
-build --@io_bazel_rules_rust//worker:use_worker=True
+build --@rules_rust//worker:use_worker=True
 build:windows --worker_quit_after_build
 ```
 

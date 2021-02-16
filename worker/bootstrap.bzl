@@ -11,7 +11,7 @@ running until Bazel shuts down, configuration changes that prompt the worker to 
 recompiled will fail, as we can't write to a running .exe file on Windows.
 """
 
-load("@io_bazel_rules_rust//rust:private/rustc.bzl", "get_cc_toolchain", "get_linker_and_args")
+load("@rules_rust//rust:private/rustc.bzl", "get_cc_toolchain", "get_linker_and_args")
 
 def _rewrite_to_unix_path(path):
     if not path:
@@ -47,7 +47,7 @@ def _get_windows_env_vars(ctx):
     return path, lib
 
 def _rust_binary_impl(ctx):
-    toolchain = ctx.toolchains["@io_bazel_rules_rust//rust:toolchain"]
+    toolchain = ctx.toolchains["@rules_rust//rust:toolchain"]
     output = ctx.actions.declare_file(ctx.label.name + toolchain.binary_ext)
     cache_dir = ctx.actions.declare_directory(ctx.label.name + "_cache")
     target_dir = ctx.actions.declare_directory(ctx.label.name + "_target")
@@ -99,7 +99,7 @@ rust_cargo_binary = rule(
     executable = True,
     toolchains = [
         "@bazel_tools//tools/cpp:toolchain_type",
-        "@io_bazel_rules_rust//rust:toolchain",
+        "@rules_rust//rust:toolchain",
     ],
     implementation = _rust_binary_impl,
     doc = "Internal, do not use this.",

@@ -1,10 +1,16 @@
 # buildifier: disable=module-docstring
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "C_COMPILE_ACTION_NAME")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
-load("@io_bazel_rules_rust//rust:private/rust.bzl", "name_to_crate_name")
-load("@io_bazel_rules_rust//rust:private/rustc.bzl", "BuildInfo", "DepInfo", "get_cc_toolchain", "get_compilation_mode_opts", "get_linker_and_args")
-load("@io_bazel_rules_rust//rust:private/utils.bzl", "expand_locations", "find_toolchain")
-load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary")
+load("//rust:rust.bzl", "rust_binary")
+
+# buildifier: disable=bzl-visibility
+load("//rust/private:rust.bzl", "name_to_crate_name")
+
+# buildifier: disable=bzl-visibility
+load("//rust/private:rustc.bzl", "BuildInfo", "DepInfo", "get_compilation_mode_opts", "get_linker_and_args")
+
+# buildifier: disable=bzl-visibility
+load("//rust/private:utils.bzl", "expand_locations", "find_cc_toolchain", "find_toolchain")
 
 def get_cc_compile_env(cc_toolchain, feature_configuration):
     """Gather cc environment variables from the given `cc_toolchain`
@@ -45,6 +51,11 @@ def _build_script_impl(ctx):
     manifest_dir = "%s.runfiles/%s/%s" % (script.path, ctx.label.workspace_name or ctx.workspace_name, ctx.label.package)
     compilation_mode_opt_level = get_compilation_mode_opts(ctx, toolchain).opt_level
 
+    streams = struct(
+        stdout = ctx.actions.declare_file(ctx.label.name + ".stdout.log"),
+        stderr = ctx.actions.declare_file(ctx.label.name + ".stderr.log"),
+    )
+
     crate_name = ctx.attr.crate_name
 
     # Derive crate name from the rule label which is <crate_name>_build_script if not provided.
@@ -71,6 +82,8 @@ def _build_script_impl(ctx):
         "CARGO_PKG_NAME": crate_name,
         "HOST": toolchain.exec_triple,
         "OPT_LEVEL": compilation_mode_opt_level,
+        # This isn't exactly right, but Bazel doesn't have exact views of "debug" and "release", so...
+        "PROFILE": {"dbg": "debug", "fastbuild": "debug", "opt": "release"}.get(ctx.var["COMPILATION_MODE"], "unknown"),
         "RUSTC": toolchain.rustc.path,
         "TARGET": toolchain.target_triple,
         # OUT_DIR is set by the runner itself, rather than on the action.
@@ -87,7 +100,7 @@ def _build_script_impl(ctx):
 
     # Pull in env vars which may be required for the cc_toolchain to work (e.g. on OSX, the SDK version).
     # We hope that the linker env is sufficient for the whole cc_toolchain.
-    cc_toolchain, feature_configuration = get_cc_toolchain(ctx)
+    cc_toolchain, feature_configuration = find_cc_toolchain(ctx)
     _, _, linker_env = get_linker_and_args(ctx, cc_toolchain, feature_configuration, None)
     env.update(**linker_env)
 
@@ -134,7 +147,18 @@ def _build_script_impl(ctx):
     # See https://doc.rust-lang.org/cargo/reference/build-scripts.html#-sys-packages
     # for details.
     args = ctx.actions.args()
-    args.add_all([script.path, crate_name, links, out_dir.path, env_out.path, flags_out.path, link_flags.path, dep_env_out.path])
+    args.add_all([
+        script.path,
+        crate_name,
+        links,
+        out_dir.path,
+        env_out.path,
+        flags_out.path,
+        link_flags.path,
+        dep_env_out.path,
+        streams.stdout.path,
+        streams.stderr.path,
+    ])
     build_script_inputs = []
     for dep in ctx.attr.deps:
         if DepInfo in dep and dep[DepInfo].dep_env:
@@ -147,7 +171,7 @@ def _build_script_impl(ctx):
     ctx.actions.run(
         executable = ctx.executable._cargo_build_script_runner,
         arguments = [args],
-        outputs = [out_dir, env_out, flags_out, link_flags, dep_env_out],
+        outputs = [out_dir, env_out, flags_out, link_flags, dep_env_out, streams.stdout, streams.stderr],
         tools = tools,
         inputs = build_script_inputs,
         mnemonic = "CargoBuildScriptRun",
@@ -162,6 +186,7 @@ def _build_script_impl(ctx):
             flags = flags_out,
             link_flags = link_flags,
         ),
+        OutputGroupInfo(streams = depset([streams.stdout, streams.stderr])),
     ]
 
 _build_script_run = rule(
@@ -171,39 +196,37 @@ _build_script_run = rule(
     ),
     implementation = _build_script_impl,
     attrs = {
-        # The source of truth will be the `cargo_build_script` macro until stardoc
-        # implements documentation inheritence. See https://github.com/bazelbuild/stardoc/issues/27
-        "script": attr.label(
-            doc = "The binary script to run, generally a rust_binary target.",
-            executable = True,
-            allow_files = True,
-            mandatory = True,
-            cfg = "exec",
-        ),
-        "crate_name": attr.string(
-            doc = "Name of the crate associated with this build script target",
-        ),
-        "links": attr.string(
-            doc = "The name of the native library this crate links against.",
-        ),
-        "deps": attr.label_list(
-            doc = "The dependencies of the crate defined by `crate_name`",
-        ),
-        "version": attr.string(
-            doc = "The semantic version (semver) of the crate",
+        "build_script_env": attr.string_dict(
+            doc = "Environment variables for build scripts.",
         ),
         "crate_features": attr.string_list(
             doc = "The list of rust features that the build script should consider activated.",
         ),
-        "build_script_env": attr.string_dict(
-            doc = "Environment variables for build scripts.",
+        "crate_name": attr.string(
+            doc = "Name of the crate associated with this build script target",
         ),
         "data": attr.label_list(
             doc = "Data or tools required by the build script.",
             allow_files = True,
         ),
-        "_cc_toolchain": attr.label(
-            default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "deps": attr.label_list(
+            doc = "The Rust dependencies of the crate defined by `crate_name`",
+            providers = [DepInfo],
+        ),
+        "links": attr.string(
+            doc = "The name of the native library this crate links against.",
+        ),
+        # The source of truth will be the `cargo_build_script` macro until stardoc
+        # implements documentation inheritence. See https://github.com/bazelbuild/stardoc/issues/27
+        "script": attr.label(
+            doc = "The binary script to run, generally a `rust_binary` target.",
+            executable = True,
+            allow_files = True,
+            mandatory = True,
+            cfg = "exec",
+        ),
+        "version": attr.string(
+            doc = "The semantic version (semver) of the crate",
         ),
         "_cargo_build_script_runner": attr.label(
             executable = True,
@@ -211,10 +234,13 @@ _build_script_run = rule(
             default = Label("//cargo/cargo_build_script_runner:cargo_build_script_runner"),
             cfg = "exec",
         ),
+        "_cc_toolchain": attr.label(
+            default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
+        ),
     },
     fragments = ["cpp"],
     toolchains = [
-        "@io_bazel_rules_rust//rust:toolchain",
+        str(Label("//rust:toolchain")),
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
 )
@@ -252,8 +278,8 @@ def cargo_build_script(
     ```python
     package(default_visibility = ["//visibility:public"])
 
-    load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
-    load("@io_bazel_rules_rust//cargo:cargo_build_script.bzl", "cargo_build_script")
+    load("@rules_rust//rust:rust.bzl", "rust_binary", "rust_library")
+    load("@rules_rust//cargo:cargo_build_script.bzl", "cargo_build_script")
 
     # This will run the build script from the root of the workspace, and
     # collect the outputs.

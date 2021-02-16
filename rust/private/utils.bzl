@@ -14,6 +14,8 @@
 
 """Utility functions not specific to the rust toolchain."""
 
+load("@bazel_tools//tools/cpp:toolchain_utils.bzl", find_rules_cc_toolchain = "find_cpp_toolchain")
+
 def find_toolchain(ctx):
     """Finds the first rust toolchain that is configured.
 
@@ -23,7 +25,26 @@ def find_toolchain(ctx):
     Returns:
         rust_toolchain: A Rust toolchain context.
     """
-    return ctx.toolchains["@io_bazel_rules_rust//rust:toolchain"]
+    return ctx.toolchains[Label("//rust:toolchain")]
+
+def find_cc_toolchain(ctx):
+    """Extracts a CcToolchain from the current target's context
+
+    Args:
+        ctx (ctx): The current target's rule context object
+
+    Returns:
+        tuple: A tuple of (CcToolchain, FeatureConfiguration)
+    """
+    cc_toolchain = find_rules_cc_toolchain(ctx)
+
+    feature_configuration = cc_common.configure_features(
+        ctx = ctx,
+        cc_toolchain = cc_toolchain,
+        requested_features = ctx.features,
+        unsupported_features = ctx.disabled_features,
+    )
+    return cc_toolchain, feature_configuration
 
 # TODO: Replace with bazel-skylib's `path.dirname`. This requires addressing some
 # dependency issues or generating docs will break.
@@ -77,6 +98,7 @@ def get_lib_name(lib):
     Returns:
         str: The name of the library
     """
+
     # NB: The suffix may contain a version number like 'so.1.2.3'
     libname = lib.basename.split(".", 1)[0]
 

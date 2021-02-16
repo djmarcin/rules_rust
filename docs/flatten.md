@@ -1,6 +1,8 @@
 # Rust rules
 
 * [cargo_build_script](#cargo_build_script)
+* [error_format](#error_format)
+* [extra_codegen](#extra_codegen)
 * [rust_analyzer](#rust_analyzer)
 * [rust_analyzer_aspect](#rust_analyzer_aspect)
 * [rust_benchmark](#rust_benchmark)
@@ -27,6 +29,57 @@
 * [rust_wasm_bindgen](#rust_wasm_bindgen)
 * [rust_wasm_bindgen_repositories](#rust_wasm_bindgen_repositories)
 * [rust_wasm_bindgen_toolchain](#rust_wasm_bindgen_toolchain)
+
+
+<a id="#error_format"></a>
+
+## error_format
+
+<pre>
+error_format(<a href="#error_format-name">name</a>)
+</pre>
+
+
+A helper rule for controlling the rustc
+[--error-format](https://doc.rust-lang.org/rustc/command-line-arguments.html#option-error-format)
+flag. Valid values match the documented values of --error-format.
+
+Typical usage is to pass `--@rules_rust//:error_format=<format>` to `bazel build`, e.g. for
+machine-readable output, `--@rules_rust//:error_format=json`.
+
+
+**ATTRIBUTES**
+
+
+| Name  | Description | Type | Mandatory | Default |
+| :------------- | :------------- | :------------- | :------------- | :------------- |
+| <a id="error_format-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/docs/build-ref.html#name">Name</a> | required |  |
+
+
+<a id="#extra_codegen"></a>
+
+## extra_codegen
+
+<pre>
+extra_codegen(<a href="#extra_codegen-name">name</a>)
+</pre>
+
+
+A helper rule for passing [--codegen](https://doc.rust-lang.org/rustc/codegen-options/index.html)
+parameters to rustc for ALL targets, such as `lto=thin`. Codegen parameters that apply only to
+single targets should use the regular rule parameter `rustc_flags`.
+
+Typical usage is to pass `--@rules_rust//:extra_codgen=<option>` to `bazel build, e.g. for LTO,
+`--@rules_rust//:extra_codegen=lto=thin`. This flag may be passed multiple times for multiple
+codegen parameters.
+
+
+**ATTRIBUTES**
+
+
+| Name  | Description | Type | Mandatory | Default |
+| :------------- | :------------- | :------------- | :------------- | :------------- |
+| <a id="extra_codegen-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/docs/build-ref.html#name">Name</a> | required |  |
 
 
 <a id="#rust_analyzer"></a>
